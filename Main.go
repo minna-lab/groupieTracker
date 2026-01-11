@@ -1,19 +1,15 @@
 package main
 
 import (
-	"fmt"
-	"log"
-	"net/http"
+	"fyne.io/fyne/v2"
+	"fyne.io/fyne/v2/app"
+	"fyne.io/fyne/v2/widget"
 )
 
 func main() {
-	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		fmt.Fprintf(w, "Bienvenue sur Groupie Tracker !\nChargement des données en cours...")
-	})
-
-	fmt.Println("Serveur démarré sur http://localhost:8080")
-	//Démarrage serveur sur le port 8080
-	if err := http.ListenAndServe(":8080", nil); err != nil {
-		log.Fatal(err)
-	}
+	a := app.New()
+	w := a.NewWindow("Groupie Tracker")
+	w.SetContent(widget.NewLabel("Fyne fonctionne ✅"))
+	w.Resize(fyne.NewSize(420, 240))
+	w.ShowAndRun()
 }
