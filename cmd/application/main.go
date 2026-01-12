@@ -11,20 +11,13 @@ import (
 	"fyne.io/fyne/v2/widget"
 )
 
-const baseURL = "https://groupietrackers.herokuapp.com"
-
-type runner interface {
-	RunOnMain(func())
-}
+type runner interface{ RunOnMain(func()) }
 
 func executerSurThreadPrincipal(f func()) {
-	// Certains drivers Fyne ont RunOnMain mais l'interface fyne.Driver ne l'expose pas.
-	// On fait donc une assertion de type.
 	if r, ok := fyne.CurrentApp().Driver().(runner); ok {
 		r.RunOnMain(f)
 		return
 	}
-	// Fallback : on exécute directement (souvent ça marche, mais c'est moins sûr)
 	f()
 }
 
@@ -38,15 +31,37 @@ func main() {
 	w.Show()
 
 	go func() {
-		var artistes []modele.Artiste
-		err := api.RecupererJSON(baseURL+"/api/artists", &artistes)
+		artistes, err := api.RecupererArtistes()
 
 		executerSurThreadPrincipal(func() {
 			if err != nil {
 				w.SetContent(container.NewCenter(widget.NewLabel("Erreur : " + err.Error())))
 				return
 			}
-			w.SetContent(interfacegraphique.VueAccueil(artistes))
+
+			var vueAccueil fyne.CanvasObject
+			vueAccueil = interfacegraphique.VueAccueil(artistes, func(artiste modele.Artiste) {
+				w.SetContent(container.NewCenter(widget.NewLabel("Chargement des détails…")))
+
+				go func() {
+					relation, err := api.RecupererRelation(artiste.ID)
+
+					executerSurThreadPrincipal(func() {
+						if err != nil {
+							w.SetContent(container.NewCenter(widget.NewLabel("Erreur : " + err.Error())))
+							return
+						}
+						w.SetContent(interfacegraphique.VueDetailsArtiste(
+							w,
+							artiste,
+							relation,
+							func() { w.SetContent(vueAccueil) },
+						))
+					})
+				}()
+			})
+
+			w.SetContent(vueAccueil)
 		})
 	}()
 
