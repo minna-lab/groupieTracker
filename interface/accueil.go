@@ -1,6 +1,7 @@
 package interfacegraphique
 
 import (
+	"strconv"
 	"strings"
 
 	"groupie-tracker/modele"
@@ -10,13 +11,19 @@ import (
 	"fyne.io/fyne/v2/widget"
 )
 
-func VueAccueil(artistes []modele.Artiste, onSelection func(modele.Artiste)) fyne.CanvasObject {
-	// Liste filtrée (au début = tout)
+func VueAccueil(
+	artistes []modele.Artiste,
+	onSelection func(modele.Artiste),
+	suggestions []modele.Suggestion,
+) fyne.CanvasObject {
+
+	// -------------------------
+	// 1) Liste filtrée des artistes
+	// -------------------------
 	artistesFiltres := make([]modele.Artiste, len(artistes))
 	copy(artistesFiltres, artistes)
 
-	// Composant liste
-	liste := widget.NewList(
+	listeArtistes := widget.NewList(
 		func() int { return len(artistesFiltres) },
 		func() fyne.CanvasObject { return widget.NewLabel("...") },
 		func(i widget.ListItemID, o fyne.CanvasObject) {
@@ -24,55 +31,150 @@ func VueAccueil(artistes []modele.Artiste, onSelection func(modele.Artiste)) fyn
 		},
 	)
 
-	liste.OnSelected = func(id widget.ListItemID) {
+	listeArtistes.OnSelected = func(id widget.ListItemID) {
 		if id >= 0 && id < len(artistesFiltres) {
 			onSelection(artistesFiltres[id])
 		}
 	}
 
-	// Champ recherche
+	// -------------------------
+	// 2) Champ de recherche
+	// -------------------------
 	recherche := widget.NewEntry()
-	recherche.SetPlaceHolder("Rechercher (nom ou membre)…")
+	recherche.SetPlaceHolder("Rechercher (artiste, membre, lieu, dates)…")
 
-	// Fonction de filtrage
-	filtrer := func(texte string) {
+	// -------------------------
+	// 3) Liste de suggestions (max 8)
+	// -------------------------
+	suggestionsFiltrees := []modele.Suggestion{}
+
+	listeSuggestions := widget.NewList(
+		func() int { return len(suggestionsFiltrees) },
+		func() fyne.CanvasObject { return widget.NewLabel("...") },
+		func(i widget.ListItemID, o fyne.CanvasObject) {
+			s := suggestionsFiltrees[i]
+			o.(*widget.Label).SetText(s.Texte + " — " + s.Type)
+		},
+	)
+
+	listeSuggestions.OnSelected = func(id widget.ListItemID) {
+		if id < 0 || id >= len(suggestionsFiltrees) {
+			return
+		}
+		recherche.SetText(suggestionsFiltrees[id].Texte) // déclenche OnChanged
+	}
+
+	// Aide : récupère les IDs d'artistes qui matchent les suggestions d’un type
+	idsDepuisSuggestions := func(texte string, typ string) map[int]bool {
+		res := make(map[int]bool)
+		for _, s := range suggestions {
+			if s.Type != typ {
+				continue
+			}
+			if strings.Contains(strings.ToLower(s.Texte), texte) {
+				res[s.ID] = true
+			}
+		}
+		return res
+	}
+
+	// -------------------------
+	// 4) Filtrage principal
+	// -------------------------
+	var filtrer func(string)
+
+	filtrer = func(texte string) {
 		texte = strings.ToLower(strings.TrimSpace(texte))
 
-		artistesFiltres = artistesFiltres[:0] // on vide sans réallouer
+		// 4.1 Suggestions (max 8)
+		suggestionsFiltrees = suggestionsFiltrees[:0]
+		if texte != "" {
+			for _, s := range suggestions {
+				if strings.Contains(strings.ToLower(s.Texte), texte) {
+					suggestionsFiltrees = append(suggestionsFiltrees, s)
+					if len(suggestionsFiltrees) == 8 {
+						break
+					}
+				}
+			}
+		}
+		listeSuggestions.Refresh()
+
+		// 4.2 Liste artistes
+		artistesFiltres = artistesFiltres[:0]
 
 		if texte == "" {
 			artistesFiltres = make([]modele.Artiste, len(artistes))
 			copy(artistesFiltres, artistes)
-			liste.Refresh()
+			listeArtistes.Refresh()
 			return
 		}
 
+		// lieux via suggestions "lieu"
+		idsLieux := idsDepuisSuggestions(texte, "lieu")
+
 		for _, a := range artistes {
-			// match sur nom
-			if strings.Contains(strings.ToLower(a.Nom), texte) {
+			nom := strings.ToLower(a.Nom)
+			creation := strconv.Itoa(a.AnneeCreation)
+			premierAlbum := strings.ToLower(a.PremierAlbum)
+
+			// nom artiste
+			if strings.Contains(nom, texte) {
 				artistesFiltres = append(artistesFiltres, a)
 				continue
 			}
-			// match sur membres
+
+			// membres
+			okMembre := false
 			for _, m := range a.Membres {
 				if strings.Contains(strings.ToLower(m), texte) {
-					artistesFiltres = append(artistesFiltres, a)
+					okMembre = true
 					break
 				}
 			}
+			if okMembre {
+				artistesFiltres = append(artistesFiltres, a)
+				continue
+			}
+
+			// année création
+			if strings.Contains(creation, texte) {
+				artistesFiltres = append(artistesFiltres, a)
+				continue
+			}
+
+			// premier album
+			if strings.Contains(premierAlbum, texte) {
+				artistesFiltres = append(artistesFiltres, a)
+				continue
+			}
+
+			// lieu
+			if idsLieux[a.ID] {
+				artistesFiltres = append(artistesFiltres, a)
+				continue
+			}
 		}
 
-		liste.Refresh()
+		listeArtistes.Refresh()
 	}
 
-	// Filtrage en temps réel
 	recherche.OnChanged = filtrer
 
+	// -------------------------
+	// 5) Layout
+	// -------------------------
 	titre := widget.NewLabelWithStyle("Artistes", fyne.TextAlignLeading, fyne.TextStyle{Bold: true})
 
+	haut := container.NewVBox(
+		titre,
+		recherche,
+		listeSuggestions,
+	)
+
 	return container.NewBorder(
-		container.NewVBox(titre, recherche),
+		haut,
 		nil, nil, nil,
-		liste,
+		listeArtistes,
 	)
 }

@@ -17,24 +17,20 @@ func main() {
 	w := a.NewWindow("Groupie Tracker")
 	w.Resize(fyne.NewSize(900, 600))
 
-	// Cache des concerts (relations)
 	cache := service.NouveauCacheRelations()
 
-	// File d’actions UI : toute modification d'UI passe par là
+	// File d’actions UI
 	ui := make(chan func(), 100)
-
-	// Boucle UI
 	go func() {
 		for f := range ui {
 			f()
 		}
 	}()
 
-	// Chargement initial (pas de retour)
+	// Chargement initial
 	w.SetContent(interfacegraphique.VueChargement("Chargement", "Récupération des artistes…", nil))
 	w.Show()
 
-	// Chargement des artistes en arrière-plan
 	go func() {
 		artistes, err := api.RecupererArtistes()
 
@@ -46,40 +42,46 @@ func main() {
 
 			var vueAccueil fyne.CanvasObject
 
-			// Accueil : liste des artistes
-			vueAccueil = interfacegraphique.VueAccueil(artistes, func(artiste modele.Artiste) {
+			// ✅ Construction des suggestions typées
+			suggestions := service.ConstruireSuggestions(artistes, cache)
 
-				// Chargement concerts (avec retour possible)
-				w.SetContent(interfacegraphique.VueChargement(
-					"Chargement",
-					"Récupération des concerts…",
-					func() { w.SetContent(vueAccueil) },
-				))
+			vueAccueil = interfacegraphique.VueAccueil(
+				artistes,
+				func(artiste modele.Artiste) {
 
-				// Récupération concerts en arrière-plan
-				go func() {
-					relation, err := service.RecupererRelationAvecCache(cache, artiste.ID)
+					w.SetContent(interfacegraphique.VueChargement(
+						"Chargement",
+						"Récupération des concerts…",
+						func() { w.SetContent(vueAccueil) },
+					))
 
-					ui <- func() {
-						if err != nil {
-							btnRetour := widget.NewButton("← Retour", func() { w.SetContent(vueAccueil) })
-							w.SetContent(container.NewCenter(container.NewVBox(
-								widget.NewLabel("Erreur : "+err.Error()),
-								btnRetour,
-							)))
-							return
+					go func() {
+						relation, err := service.RecupererRelationAvecCache(cache, artiste.ID)
+
+						ui <- func() {
+							if err != nil {
+								btnRetour := widget.NewButton("← Retour", func() { w.SetContent(vueAccueil) })
+								w.SetContent(container.NewCenter(container.NewVBox(
+									widget.NewLabel("Erreur : "+err.Error()),
+									btnRetour,
+								)))
+								return
+							}
+
+							// Mise à jour suggestions avec les lieux (maintenant en cache)
+							suggestions = service.ConstruireSuggestions(artistes, cache)
+
+							w.SetContent(interfacegraphique.VueDetailsArtiste(
+								w,
+								artiste,
+								relation,
+								func() { w.SetContent(vueAccueil) },
+							))
 						}
-
-						// Affiche les détails (ta fonction attend w en 1er paramètre)
-						w.SetContent(interfacegraphique.VueDetailsArtiste(
-							w,
-							artiste,
-							relation,
-							func() { w.SetContent(vueAccueil) },
-						))
-					}
-				}()
-			})
+					}()
+				},
+				suggestions,
+			)
 
 			w.SetContent(vueAccueil)
 		}
