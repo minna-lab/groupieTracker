@@ -15,6 +15,7 @@ func VueAccueil(
 	artistes []modele.Artiste,
 	onSelection func(modele.Artiste),
 	suggestions []modele.Suggestion,
+	onChargerLieux func(progress func(fait, total int), fin func(err error)),
 ) fyne.CanvasObject {
 
 	// -------------------------
@@ -64,7 +65,7 @@ func VueAccueil(
 		recherche.SetText(suggestionsFiltrees[id].Texte) // déclenche OnChanged
 	}
 
-	// Aide : récupère les IDs d'artistes qui matchent les suggestions d’un type
+	// Aide : IDs d'artistes qui matchent les suggestions d’un type
 	idsDepuisSuggestions := func(texte string, typ string) map[int]bool {
 		res := make(map[int]bool)
 		for _, s := range suggestions {
@@ -79,14 +80,43 @@ func VueAccueil(
 	}
 
 	// -------------------------
-	// 4) Filtrage principal
+	// 4) Etat + bouton chargement lieux (corrigé)
+	// -------------------------
+	etat := widget.NewLabel("")
+
+	var btnChargerLieux *widget.Button
+	btnChargerLieux = widget.NewButton("Charger les lieux (recherche avancée)", func() {
+		if onChargerLieux == nil {
+			return
+		}
+
+		btnChargerLieux.Disable()
+		etat.SetText("Chargement des lieux…")
+
+		onChargerLieux(
+			func(fait, total int) {
+				etat.SetText("Indexation : " + strconv.Itoa(fait) + "/" + strconv.Itoa(total))
+			},
+			func(err error) {
+				btnChargerLieux.Enable()
+				if err != nil {
+					etat.SetText("Erreur : " + err.Error())
+					return
+				}
+				etat.SetText("Lieux chargés ✅ (recherche par lieu active)")
+			},
+		)
+	})
+
+	// -------------------------
+	// 5) Filtrage principal
 	// -------------------------
 	var filtrer func(string)
 
 	filtrer = func(texte string) {
 		texte = strings.ToLower(strings.TrimSpace(texte))
 
-		// 4.1 Suggestions (max 8)
+		// Suggestions (max 8)
 		suggestionsFiltrees = suggestionsFiltrees[:0]
 		if texte != "" {
 			for _, s := range suggestions {
@@ -100,9 +130,8 @@ func VueAccueil(
 		}
 		listeSuggestions.Refresh()
 
-		// 4.2 Liste artistes
+		// Artistes
 		artistesFiltres = artistesFiltres[:0]
-
 		if texte == "" {
 			artistesFiltres = make([]modele.Artiste, len(artistes))
 			copy(artistesFiltres, artistes)
@@ -110,7 +139,6 @@ func VueAccueil(
 			return
 		}
 
-		// lieux via suggestions "lieu"
 		idsLieux := idsDepuisSuggestions(texte, "lieu")
 
 		for _, a := range artistes {
@@ -118,7 +146,7 @@ func VueAccueil(
 			creation := strconv.Itoa(a.AnneeCreation)
 			premierAlbum := strings.ToLower(a.PremierAlbum)
 
-			// nom artiste
+			// artiste
 			if strings.Contains(nom, texte) {
 				artistesFiltres = append(artistesFiltres, a)
 				continue
@@ -149,7 +177,7 @@ func VueAccueil(
 				continue
 			}
 
-			// lieu
+			// lieux (via suggestions)
 			if idsLieux[a.ID] {
 				artistesFiltres = append(artistesFiltres, a)
 				continue
@@ -162,7 +190,7 @@ func VueAccueil(
 	recherche.OnChanged = filtrer
 
 	// -------------------------
-	// 5) Layout
+	// 6) Layout
 	// -------------------------
 	titre := widget.NewLabelWithStyle("Artistes", fyne.TextAlignLeading, fyne.TextStyle{Bold: true})
 
@@ -170,11 +198,9 @@ func VueAccueil(
 		titre,
 		recherche,
 		listeSuggestions,
+		btnChargerLieux,
+		etat,
 	)
 
-	return container.NewBorder(
-		haut,
-		nil, nil, nil,
-		listeArtistes,
-	)
+	return container.NewBorder(haut, nil, nil, nil, listeArtistes)
 }
