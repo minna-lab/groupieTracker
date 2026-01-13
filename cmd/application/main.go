@@ -42,6 +42,7 @@ func main() {
 			}
 
 			var vueAccueil fyne.CanvasObject
+			var onglets *container.AppTabs
 
 			// ✅ 1) On déclare d'abord la fonction de refresh (sinon scope error)
 			var rafraichirAccueil func()
@@ -75,7 +76,9 @@ func main() {
 			// ✅ 3) Construction / reconstruction de l'accueil
 			rafraichirAccueil = func() {
 				suggestions := service.ConstruireSuggestions(artistes, cache)
+				gestionnaireFavoris := service.ObtenirGestionnaireFavoris()
 
+				// Vue accueil artistes
 				vueAccueil = interfacegraphique.VueAccueil(
 					artistes,
 
@@ -84,7 +87,7 @@ func main() {
 						w.SetContent(interfacegraphique.VueChargement(
 							"Chargement",
 							"Récupération des concerts…",
-							func() { w.SetContent(vueAccueil) },
+							func() { w.SetContent(onglets) },
 						))
 
 						go func() {
@@ -92,7 +95,7 @@ func main() {
 
 							ui <- func() {
 								if err != nil {
-									btnRetour := widget.NewButton("← Retour", func() { w.SetContent(vueAccueil) })
+									btnRetour := widget.NewButton("← Retour", func() { w.SetContent(onglets) })
 									w.SetContent(container.NewCenter(container.NewVBox(
 										widget.NewLabel("Erreur : "+err.Error()),
 										btnRetour,
@@ -104,7 +107,7 @@ func main() {
 									w,
 									artiste,
 									relation,
-									func() { w.SetContent(vueAccueil) },
+									func() { w.SetContent(onglets) },
 								))
 							}
 						}()
@@ -117,7 +120,51 @@ func main() {
 					onChargerLieux,
 				)
 
-				w.SetContent(vueAccueil)
+				// Vue favoris
+				vueFavoris := interfacegraphique.VueFavoris(
+					// clic artiste favori => détails
+					func(artiste modele.Artiste) {
+						w.SetContent(interfacegraphique.VueChargement(
+							"Chargement",
+							"Récupération des concerts…",
+							func() { w.SetContent(onglets) },
+						))
+
+						go func() {
+							relation, err := service.RecupererRelationAvecCache(cache, artiste.ID)
+
+							ui <- func() {
+								if err != nil {
+									btnRetour := widget.NewButton("← Retour", func() { w.SetContent(onglets) })
+									w.SetContent(container.NewCenter(container.NewVBox(
+										widget.NewLabel("Erreur : "+err.Error()),
+										btnRetour,
+									)))
+									return
+								}
+
+								w.SetContent(interfacegraphique.VueDetailsArtiste(
+									w,
+									artiste,
+									relation,
+									func() { w.SetContent(onglets) },
+								))
+							}
+						}()
+					},
+					// fonction pour rafraîchir la liste des favoris
+					func() []modele.Artiste {
+						return gestionnaireFavoris.ObtenirFavoris()
+					},
+				)
+
+				// Onglets
+				onglets = container.NewAppTabs(
+					container.NewTabItem("Artistes", vueAccueil),
+					container.NewTabItem("❤️ Favoris", vueFavoris),
+				)
+
+				w.SetContent(onglets)
 			}
 
 			// Premier affichage
