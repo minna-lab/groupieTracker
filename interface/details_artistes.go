@@ -2,12 +2,16 @@ package interfacegraphique
 
 import (
 	"fmt"
+	"net/url"
+	"path/filepath"
 	"sort"
 
 	"groupie-tracker/modele"
+	"groupie-tracker/service"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/container"
+	"fyne.io/fyne/v2/dialog"
 	"fyne.io/fyne/v2/widget"
 )
 
@@ -37,6 +41,35 @@ func VueDetailsArtiste(
 
 	btnRetour := widget.NewButton("← Retour", retour)
 
+	// ✅ Bouton carte (corrigé)
+	btnCarte := widget.NewButton("Voir sur la carte", func() {
+		markers, err := service.ConstruireMarkers(relation)
+		if err != nil {
+			dialog.ShowError(err, fenetre)
+			return
+		}
+
+		chemin, err := service.GenererFichierCarteHTML(artiste.Nom, markers)
+		if err != nil {
+			dialog.ShowError(err, fenetre)
+			return
+		}
+
+		abs, err := filepath.Abs(chemin)
+		if err != nil {
+			dialog.ShowError(err, fenetre)
+			return
+		}
+
+		u, err := url.Parse("file://" + abs)
+		if err != nil {
+			dialog.ShowError(err, fenetre)
+			return
+		}
+
+		_ = fyne.CurrentApp().OpenURL(u)
+	})
+
 	titre := widget.NewLabelWithStyle(
 		artiste.Nom,
 		fyne.TextAlignLeading,
@@ -56,8 +89,15 @@ func VueDetailsArtiste(
 	concerts.SetText(texteConcerts)
 	concerts.Disable()
 
+	haut := container.NewVBox(
+		container.NewHBox(btnRetour, btnCarte),
+		titre,
+		infos,
+		membres,
+	)
+
 	return container.NewBorder(
-		container.NewVBox(btnRetour, titre, infos, membres),
+		haut,
 		nil, nil, nil,
 		container.NewScroll(concerts),
 	)
