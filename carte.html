@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>Carte - SOJA</title>
+<title>Carte - Queen</title>
 
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -19,7 +19,7 @@
 <div class="footer">Données carte © OpenStreetMap contributors</div>
 
 <script>
-  const markers = [{"lieu":"noumea-new_caledonia","lat":-22.2745264,"lon":166.442419,"popup":"\u003cb\u003enoumea new_caledonia\u003c/b\u003e\u003cbr/\u003e15-11-2019"},{"lieu":"papeete-french_polynesia","lat":-17.5373835,"lon":-149.5659964,"popup":"\u003cb\u003epapeete french_polynesia\u003c/b\u003e\u003cbr/\u003e16-11-2019"},{"lieu":"playa_del_carmen-mexico","lat":20.6461095,"lon":-87.0809021,"popup":"\u003cb\u003eplaya_del_carmen mexico\u003c/b\u003e\u003cbr/\u003e05-12-2019\u003cbr/\u003e06-12-2019\u003cbr/\u003e07-12-2019\u003cbr/\u003e08-12-2019\u003cbr/\u003e09-12-2019"}];
+  const markers = [{"lieu":"osaka-japan","lat":34.6937569,"lon":135.5014539,"popup":"\u003cb\u003eosaka japan\u003c/b\u003e\u003cbr/\u003e28-01-2020"},{"lieu":"penrose-new_zealand","lat":-36.9111443,"lon":174.8147813,"popup":"\u003cb\u003epenrose new_zealand\u003c/b\u003e\u003cbr/\u003e07-02-2020"},{"lieu":"saitama-japan","lat":35.9754168,"lon":139.4160114,"popup":"\u003cb\u003esaitama japan\u003c/b\u003e\u003cbr/\u003e26-01-2020"},{"lieu":"dunedin-new_zealand","lat":-45.8740984,"lon":170.5035755,"popup":"\u003cb\u003edunedin new_zealand\u003c/b\u003e\u003cbr/\u003e10-02-2020"},{"lieu":"georgia-usa","lat":32.3293809,"lon":-83.1137366,"popup":"\u003cb\u003egeorgia usa\u003c/b\u003e\u003cbr/\u003e22-08-2019"},{"lieu":"los_angeles-usa","lat":34.0536909,"lon":-118.242766,"popup":"\u003cb\u003elos_angeles usa\u003c/b\u003e\u003cbr/\u003e20-08-2019"},{"lieu":"nagoya-japan","lat":35.1851045,"lon":136.8998438,"popup":"\u003cb\u003enagoya japan\u003c/b\u003e\u003cbr/\u003e30-01-2019"},{"lieu":"north_carolina-usa","lat":35.6729639,"lon":-79.0392919,"popup":"\u003cb\u003enorth_carolina usa\u003c/b\u003e\u003cbr/\u003e23-08-2019"}];
 
   const map = L.map('map');
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {

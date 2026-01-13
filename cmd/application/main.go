@@ -14,6 +14,8 @@ import (
 
 func main() {
 	a := app.New()
+	a.Settings().SetTheme(interfacegraphique.ThemePerso{})
+
 	w := a.NewWindow("Groupie Tracker")
 	w.Resize(fyne.NewSize(900, 600))
 
