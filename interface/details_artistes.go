@@ -86,9 +86,9 @@ func VueDetailsArtiste(
 
 	// Bouton Spotify
 	btnSpotify := widget.NewButton("🎵 Écouter sur Spotify", func() {
-		// Créer une URL de recherche Spotify
+		// Utiliser le protocole spotify:// qui ouvre l'application Spotify
 		searchQuery := url.QueryEscape(artiste.Nom)
-		spotifyURL := "https://open.spotify.com/search/" + searchQuery
+		spotifyURL := "spotify:search:" + searchQuery
 
 		u, err := url.Parse(spotifyURL)
 		if err != nil {
