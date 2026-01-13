@@ -1,0 +1,19 @@
+{
+  "2": {
+    "id": 2,
+    "image": "https://groupietrackers.herokuapp.com/api/images/soja.jpeg",
+    "name": "SOJA",
+    "members": [
+      "Jacob Hemphill",
+      "Bob Jefferson",
+      "Ryan \"Byrd\" Berty",
+      "Ken Brownell",
+      "Patrick O'Shea",
+      "Hellman Escorcia",
+      "Rafael Rodriguez",
+      "Trevor Young"
+    ],
+    "creationDate": 1997,
+    "firstAlbum": "05-06-2002"
+  }
+}
