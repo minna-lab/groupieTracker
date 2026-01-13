@@ -5,7 +5,6 @@ import (
 	"groupie-tracker/modele"
 )
 
-// Récupère tous les artistes
 func RecupererArtistes() ([]modele.Artiste, error) {
 	var artistes []modele.Artiste
 	err := RecupererJSON(
@@ -15,7 +14,6 @@ func RecupererArtistes() ([]modele.Artiste, error) {
 	return artistes, err
 }
 
-// Récupère les relations (concerts) d’un artiste
 func RecupererRelation(id int) (modele.Relation, error) {
 	var relation modele.Relation
 	err := RecupererJSON(
