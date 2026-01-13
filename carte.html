@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Carte - SOJA</title>
+
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+<style>
+  body { margin:0; font-family: Arial, sans-serif; }
+  #map { height: 100vh; width: 100vw; }
+  .footer { position: absolute; bottom: 8px; left: 8px; background: rgba(255,255,255,0.85); padding: 6px 8px; border-radius: 6px; font-size: 12px; }
+</style>
+</head>
+<body>
+<div id="map"></div>
+<div class="footer">Données carte © OpenStreetMap contributors</div>
+
+<script>
+  const markers = [{"lieu":"noumea-new_caledonia","lat":-22.2745264,"lon":166.442419,"popup":"\u003cb\u003enoumea new_caledonia\u003c/b\u003e\u003cbr/\u003e15-11-2019"},{"lieu":"papeete-french_polynesia","lat":-17.5373835,"lon":-149.5659964,"popup":"\u003cb\u003epapeete french_polynesia\u003c/b\u003e\u003cbr/\u003e16-11-2019"},{"lieu":"playa_del_carmen-mexico","lat":20.6461095,"lon":-87.0809021,"popup":"\u003cb\u003eplaya_del_carmen mexico\u003c/b\u003e\u003cbr/\u003e05-12-2019\u003cbr/\u003e06-12-2019\u003cbr/\u003e07-12-2019\u003cbr/\u003e08-12-2019\u003cbr/\u003e09-12-2019"}];
+
+  const map = L.map('map');
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    maxZoom: 18,
+    attribution: '&copy; OpenStreetMap contributors'
+  }).addTo(map);
+
+  if (markers.length === 0) {
+    map.setView([48.8566, 2.3522], 5); // fallback: Paris
+  } else {
+    const bounds = [];
+    markers.forEach(m => {
+      const mk = L.marker([m.lat, m.lon]).addTo(map);
+      mk.bindPopup(m.popup);
+      bounds.push([m.lat, m.lon]);
+    });
+    map.fitBounds(bounds, { padding: [30, 30] });
+  }
+</script>
+</body>
+</html>
