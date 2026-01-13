@@ -41,6 +41,20 @@ func VueDetailsArtiste(
 
 	btnRetour := widget.NewButton("← Retour", retour)
 
+	// Bouton like/unlike
+	gestionnaireFavoris := service.ObtenirGestionnaireFavoris()
+	estFavori := gestionnaireFavoris.EstFavori(artiste.ID)
+
+	var btnLike *widget.Button
+	btnLike = widget.NewButton(map[bool]string{true: "💔 Retirer des favoris", false: "❤️ Ajouter aux favoris"}[estFavori], func() {
+		ajoute := gestionnaireFavoris.Basculer(artiste)
+		if ajoute {
+			btnLike.SetText("💔 Retirer des favoris")
+		} else {
+			btnLike.SetText("❤️ Ajouter aux favoris")
+		}
+	})
+
 	// ✅ Bouton carte (corrigé)
 	btnCarte := widget.NewButton("Voir sur la carte", func() {
 		markers, err := service.ConstruireMarkers(relation)
@@ -90,7 +104,7 @@ func VueDetailsArtiste(
 	concerts.Disable()
 
 	haut := container.NewVBox(
-		container.NewHBox(btnRetour, btnCarte),
+		container.NewHBox(btnRetour, btnLike, btnCarte),
 		titre,
 		infos,
 		membres,
