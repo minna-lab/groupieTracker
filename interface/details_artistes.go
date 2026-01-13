@@ -56,7 +56,7 @@ func VueDetailsArtiste(
 	})
 
 	// ✅ Bouton carte (corrigé)
-	btnCarte := widget.NewButton("Voir sur la carte", func() {
+	btnCarte := widget.NewButton("🗺️ Voir sur la carte", func() {
 		markers, err := service.ConstruireMarkers(relation)
 		if err != nil {
 			dialog.ShowError(err, fenetre)
@@ -76,6 +76,21 @@ func VueDetailsArtiste(
 		}
 
 		u, err := url.Parse("file://" + abs)
+		if err != nil {
+			dialog.ShowError(err, fenetre)
+			return
+		}
+
+		_ = fyne.CurrentApp().OpenURL(u)
+	})
+
+	// Bouton Spotify
+	btnSpotify := widget.NewButton("🎵 Écouter sur Spotify", func() {
+		// Utiliser le protocole spotify:// qui ouvre l'application Spotify
+		searchQuery := url.QueryEscape(artiste.Nom)
+		spotifyURL := "spotify:search:" + searchQuery
+
+		u, err := url.Parse(spotifyURL)
 		if err != nil {
 			dialog.ShowError(err, fenetre)
 			return
@@ -104,7 +119,7 @@ func VueDetailsArtiste(
 	concerts.Disable()
 
 	haut := container.NewVBox(
-		container.NewHBox(btnRetour, btnLike, btnCarte),
+		container.NewHBox(btnRetour, btnLike, btnCarte, btnSpotify),
 		titre,
 		infos,
 		membres,
