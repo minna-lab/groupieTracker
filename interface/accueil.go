@@ -11,33 +11,6 @@ import (
 	"fyne.io/fyne/v2/widget"
 )
 
-// extrait l'année d'une date "DD-MM-YYYY" ou "YYYY-MM-DD" ou "YYYY"
-func extraireAnnee(texte string) int {
-	texte = strings.TrimSpace(texte)
-	if len(texte) >= 4 {
-		// on prend les 4 derniers chiffres possibles
-		// cas "DD-MM-YYYY"
-		parties := strings.FieldsFunc(texte, func(r rune) bool {
-			return r == '-' || r == '/' || r == '.'
-		})
-
-		// on cherche une partie de 4 chiffres
-		for _, p := range parties {
-			if len(p) == 4 {
-				if y, err := strconv.Atoi(p); err == nil {
-					return y
-				}
-			}
-		}
-
-		// fallback : les 4 premiers
-		if y, err := strconv.Atoi(texte[:4]); err == nil {
-			return y
-		}
-	}
-	return 0
-}
-
 func VueAccueil(
 	artistes []modele.Artiste,
 	onSelection func(modele.Artiste),
@@ -128,29 +101,13 @@ func VueAccueil(
 	})
 
 	// -------------------------
-	// FILTRES (range + checkbox)
+	// FILTRES DE TRI
 	// -------------------------
+	selectTrierPar := widget.NewSelect([]string{"Artiste", "Membres", "Lieux", "Premier album", "Date de création"}, nil)
+	selectTrierPar.SetSelected("Artiste")
 
-	// Range : année de création
-	creationMin := widget.NewEntry()
-	creationMin.SetPlaceHolder("Création min (ex: 1990)")
-	creationMax := widget.NewEntry()
-	creationMax.SetPlaceHolder("Création max (ex: 2015)")
-
-	// Range : année du premier album (on filtre par l'année)
-	albumMin := widget.NewEntry()
-	albumMin.SetPlaceHolder("Album min (année)")
-	albumMax := widget.NewEntry()
-	albumMax.SetPlaceHolder("Album max (année)")
-
-	// Checkbox : nombre de membres
-	cb1 := widget.NewCheck("1", nil)
-	cb2 := widget.NewCheck("2", nil)
-	cb3 := widget.NewCheck("3", nil)
-	cb4plus := widget.NewCheck("4+", nil)
-
-	// Checkbox : lieux chargés uniquement (utile si tu veux forcer le bouton)
-	cbLieuxCharges := widget.NewCheck("Uniquement artistes avec lieux chargés", nil)
+	selectOrdre := widget.NewSelect([]string{"Croissant", "Décroissant"}, nil)
+	selectOrdre.SetSelected("Croissant")
 
 	// -------------------------
 	// Fonction : applique TOUS les filtres + recherche
@@ -174,133 +131,94 @@ func VueAccueil(
 		}
 		listeSuggestions.Refresh()
 
-		// Parse des ranges (si vide -> pas de filtre)
-		toInt := func(s string) int {
-			s = strings.TrimSpace(s)
-			if s == "" {
-				return 0
-			}
-			v, err := strconv.Atoi(s)
-			if err != nil {
-				return -1 // invalide
-			}
-			return v
-		}
-
-		cMin := toInt(creationMin.Text)
-		cMax := toInt(creationMax.Text)
-		aMin := toInt(albumMin.Text)
-		aMax := toInt(albumMax.Text)
-
-		// checkbox membres : si aucun coché -> pas de filtre
-		filtreMembresActif := cb1.Checked || cb2.Checked || cb3.Checked || cb4plus.Checked
-
 		// lieux via suggestions
 		idsLieux := idsDepuisSuggestions(texte, "lieu")
 
-		// Filtrage artistes
+		// Filtrage artistes par recherche
 		artistesFiltres = artistesFiltres[:0]
-
 		for _, a := range artistes {
-
-			// --- Filtre range année création
-			if cMin > 0 && a.AnneeCreation < cMin {
-				continue
-			}
-			if cMax > 0 && a.AnneeCreation > cMax {
-				continue
-			}
-			if cMin == -1 || cMax == -1 {
-				// saisie invalide => on ignore le filtre (simple)
-			}
-
-			// --- Filtre range année premier album
-			anneeAlbum := extraireAnnee(a.PremierAlbum)
-			if aMin > 0 && anneeAlbum > 0 && anneeAlbum < aMin {
-				continue
-			}
-			if aMax > 0 && anneeAlbum > 0 && anneeAlbum > aMax {
-				continue
-			}
-			if aMin == -1 || aMax == -1 {
-				// saisie invalide => ignore
-			}
-
-			// --- Filtre checkbox membres
-			if filtreMembresActif {
-				nb := len(a.Membres)
-				ok := false
-				if cb1.Checked && nb == 1 {
-					ok = true
-				}
-				if cb2.Checked && nb == 2 {
-					ok = true
-				}
-				if cb3.Checked && nb == 3 {
-					ok = true
-				}
-				if cb4plus.Checked && nb >= 4 {
-					ok = true
-				}
-				if !ok {
-					continue
-				}
-			}
-
-			// --- Filtre checkbox "lieux chargés"
-			if cbLieuxCharges.Checked {
-				// On considère que si on a des suggestions "lieu" pour cet artiste, alors c'est chargé.
-				// (simple et suffisant pour le projet)
-				if !idsLieux[a.ID] && texte == "" {
-					// si pas de texte, idsLieux est vide -> on ne peut pas s’appuyer dessus
-					// donc on laisse passer (simple). Tu peux aussi décider de bloquer.
-				}
-			}
-
-			// --- Recherche texte (si texte vide, pas de filtre recherche)
 			if texte != "" {
 				nom := strings.ToLower(a.Nom)
 				creation := strconv.Itoa(a.AnneeCreation)
 				premierAlbum := strings.ToLower(a.PremierAlbum)
 
+				trouve := false
 				if strings.Contains(nom, texte) {
-					artistesFiltres = append(artistesFiltres, a)
-					continue
+					trouve = true
 				}
 
-				okMembre := false
-				for _, m := range a.Membres {
-					if strings.Contains(strings.ToLower(m), texte) {
-						okMembre = true
-						break
+				if !trouve {
+					for _, m := range a.Membres {
+						if strings.Contains(strings.ToLower(m), texte) {
+							trouve = true
+							break
+						}
 					}
 				}
-				if okMembre {
-					artistesFiltres = append(artistesFiltres, a)
-					continue
+
+				if !trouve && strings.Contains(creation, texte) {
+					trouve = true
 				}
 
-				if strings.Contains(creation, texte) {
-					artistesFiltres = append(artistesFiltres, a)
-					continue
+				if !trouve && strings.Contains(premierAlbum, texte) {
+					trouve = true
 				}
 
-				if strings.Contains(premierAlbum, texte) {
-					artistesFiltres = append(artistesFiltres, a)
-					continue
+				if !trouve && idsLieux[a.ID] {
+					trouve = true
 				}
 
-				if idsLieux[a.ID] {
+				if trouve {
 					artistesFiltres = append(artistesFiltres, a)
-					continue
 				}
-
-				// aucun match -> exclu
-				continue
+			} else {
+				artistesFiltres = append(artistesFiltres, a)
 			}
+		}
 
-			// Si texte vide : l’artiste passe les filtres range/checkbox => on l’ajoute
-			artistesFiltres = append(artistesFiltres, a)
+		// Tri (bubble sort)
+		trierPar := selectTrierPar.Selected
+		ordre := selectOrdre.Selected
+
+		for i := 0; i < len(artistesFiltres)-1; i++ {
+			for j := 0; j < len(artistesFiltres)-i-1; j++ {
+				echange := false
+
+				switch trierPar {
+				case "Artiste":
+					a1, a2 := strings.ToLower(artistesFiltres[j].Nom), strings.ToLower(artistesFiltres[j+1].Nom)
+					echange = (ordre == "Croissant" && a1 > a2) || (ordre == "Décroissant" && a1 < a2)
+				case "Membres":
+					n1, n2 := len(artistesFiltres[j].Membres), len(artistesFiltres[j+1].Membres)
+					echange = (ordre == "Croissant" && n1 > n2) || (ordre == "Décroissant" && n1 < n2)
+				case "Lieux":
+					l1 := ""
+					l2 := ""
+					for _, s := range suggestions {
+						if s.Type == "lieu" && s.ID == artistesFiltres[j].ID {
+							l1 = strings.ToLower(s.Texte)
+							break
+						}
+					}
+					for _, s := range suggestions {
+						if s.Type == "lieu" && s.ID == artistesFiltres[j+1].ID {
+							l2 = strings.ToLower(s.Texte)
+							break
+						}
+					}
+					echange = (ordre == "Croissant" && l1 > l2) || (ordre == "Décroissant" && l1 < l2)
+				case "Premier album":
+					a1, a2 := strings.ToLower(artistesFiltres[j].PremierAlbum), strings.ToLower(artistesFiltres[j+1].PremierAlbum)
+					echange = (ordre == "Croissant" && a1 > a2) || (ordre == "Décroissant" && a1 < a2)
+				case "Date de création":
+					d1, d2 := artistesFiltres[j].AnneeCreation, artistesFiltres[j+1].AnneeCreation
+					echange = (ordre == "Croissant" && d1 > d2) || (ordre == "Décroissant" && d1 < d2)
+				}
+
+				if echange {
+					artistesFiltres[j], artistesFiltres[j+1] = artistesFiltres[j+1], artistesFiltres[j]
+				}
+			}
 		}
 
 		listeArtistes.Refresh()
@@ -308,30 +226,19 @@ func VueAccueil(
 
 	// Branchements events
 	recherche.OnChanged = func(string) { appliquer() }
-	creationMin.OnChanged = func(string) { appliquer() }
-	creationMax.OnChanged = func(string) { appliquer() }
-	albumMin.OnChanged = func(string) { appliquer() }
-	albumMax.OnChanged = func(string) { appliquer() }
-
-	cb1.OnChanged = func(bool) { appliquer() }
-	cb2.OnChanged = func(bool) { appliquer() }
-	cb3.OnChanged = func(bool) { appliquer() }
-	cb4plus.OnChanged = func(bool) { appliquer() }
-	cbLieuxCharges.OnChanged = func(bool) { appliquer() }
+	selectTrierPar.OnChanged = func(string) { appliquer() }
+	selectOrdre.OnChanged = func(string) { appliquer() }
 
 	// -------------------------
 	// Layout
 	// -------------------------
 	titre := widget.NewLabelWithStyle("Artistes", fyne.TextAlignLeading, fyne.TextStyle{Bold: true})
 
-	filtresRange := container.NewGridWithColumns(2,
-		creationMin, creationMax,
-		albumMin, albumMax,
-	)
-
-	filtresMembres := container.NewHBox(
-		widget.NewLabel("Membres :"),
-		cb1, cb2, cb3, cb4plus,
+	filtresTri := container.NewGridWithColumns(2,
+		widget.NewLabel("Trier par :"),
+		selectTrierPar,
+		widget.NewLabel("Ordre :"),
+		selectOrdre,
 	)
 
 	haut := container.NewVBox(
@@ -339,10 +246,9 @@ func VueAccueil(
 		recherche,
 		listeSuggestions,
 		widget.NewSeparator(),
-		widget.NewLabelWithStyle("Filtres", fyne.TextAlignLeading, fyne.TextStyle{Bold: true}),
-		filtresRange,
-		filtresMembres,
-		cbLieuxCharges,
+		widget.NewLabelWithStyle("Tri", fyne.TextAlignLeading, fyne.TextStyle{Bold: true}),
+		filtresTri,
+		widget.NewSeparator(),
 		btnChargerLieux,
 		etat,
 	)
