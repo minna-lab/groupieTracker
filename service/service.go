@@ -2,17 +2,12 @@ package service
 
 import (
 	"encoding/json"
-	"errors"
-	"fmt"
 	"groupie-tracker/api"
 	"groupie-tracker/modele"
-	"net/http"
-	"net/url"
 	"os"
 	"strconv"
 	"strings"
 	"sync"
-	"time"
 )
 
 // Cache thread-safe pour les relations
@@ -111,72 +106,10 @@ func (g *GestionnaireFavoris) charger() {
 	}
 }
 
-// Geocodage avec cache
-const fichierCacheGeocodage = "cache_geocodage.json"
-
-type cacheGeocodage map[string]modele.Coordonnees
-type reponseNominatim struct {
-	Lat, Lon string `json:"lat,lon"`
-}
-
-func chargerCacheGeocodage() cacheGeocodage {
-	var c cacheGeocodage
-	if b, err := os.ReadFile(fichierCacheGeocodage); err == nil {
-		json.Unmarshal(b, &c)
-	}
-	if c == nil {
-		c = cacheGeocodage{}
-	}
-	return c
-}
-
-func sauverCacheGeocodage(c cacheGeocodage) {
-	if b, err := json.MarshalIndent(c, "", "  "); err == nil {
-		os.WriteFile(fichierCacheGeocodage, b, 0644)
-	}
-}
-
 func normaliserLieu(lieu string) string {
 	lieu = strings.ToLower(strings.TrimSpace(lieu))
 	lieu = strings.ReplaceAll(strings.ReplaceAll(lieu, "-", ", "), "_", " ")
 	return strings.Join(strings.Fields(lieu), " ")
-}
-
-func GeocoderLieu(lieu string, client *http.Client, cache cacheGeocodage) (modele.Coordonnees, bool, error) {
-	lieu = normaliserLieu(lieu)
-	if lieu == "" {
-		return modele.Coordonnees{}, false, errors.New("lieu vide")
-	}
-	if v, ok := cache[lieu]; ok {
-		return v, true, nil
-	}
-
-	req, _ := http.NewRequest("GET", "https://nominatim.openstreetmap.org/search?format=json&limit=1&q="+url.QueryEscape(lieu), nil)
-	req.Header.Set("User-Agent", "groupie-tracker-fyne/1.0")
-
-	resp, err := client.Do(req)
-	if err != nil || resp.StatusCode != 200 {
-		return modele.Coordonnees{}, false, fmt.Errorf("erreur API: %v", err)
-	}
-	defer resp.Body.Close()
-
-	var arr []struct {
-		Lat string `json:"lat"`
-		Lon string `json:"lon"`
-	}
-	if json.NewDecoder(resp.Body).Decode(&arr) != nil || len(arr) == 0 {
-		return modele.Coordonnees{}, false, nil
-	}
-
-	var lat, lon float64
-	fmt.Sscanf(arr[0].Lat, "%f", &lat)
-	fmt.Sscanf(arr[0].Lon, "%f", &lon)
-
-	coord := modele.Coordonnees{Lat: lat, Lon: lon}
-	cache[lieu] = coord
-	sauverCacheGeocodage(cache)
-	time.Sleep(1100 * time.Millisecond)
-	return coord, false, nil
 }
 
 // Construction des suggestions de recherche
