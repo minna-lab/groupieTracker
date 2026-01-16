@@ -5,6 +5,7 @@ import (
 	"net/url"
 	"path/filepath"
 	"sort"
+	"strings"
 
 	"groupie-tracker/modele"
 	"groupie-tracker/service"
@@ -15,6 +16,15 @@ import (
 	"fyne.io/fyne/v2/widget"
 )
 
+// coupe un texte trop long pour éviter qu'il déborde
+func tronquer(texte string, max int) string {
+	texte = strings.TrimSpace(texte)
+	if max <= 0 || len(texte) <= max {
+		return texte
+	}
+	return texte[:max-1] + "…"
+}
+
 func VueDetailsArtiste(
 	fenetre fyne.Window,
 	artiste modele.Artiste,
@@ -22,40 +32,29 @@ func VueDetailsArtiste(
 	retour func(),
 ) fyne.CanvasObject {
 
-	// Trier les lieux pour un affichage propre
-	lieux := make([]string, 0, len(relation.DatesParLieu))
-	for lieu := range relation.DatesParLieu {
-		lieux = append(lieux, lieu)
-	}
-	sort.Strings(lieux)
-
-	// Construire le texte des concerts
-	texteConcerts := ""
-	for _, lieu := range lieux {
-		texteConcerts += fmt.Sprintf("📍 %s\n", lieu)
-		for _, date := range relation.DatesParLieu[lieu] {
-			texteConcerts += fmt.Sprintf("   - %s\n", date)
-		}
-		texteConcerts += "\n"
-	}
-
+	// -------------------------
+	// Boutons du haut
+	// -------------------------
 	btnRetour := widget.NewButton("← Retour", retour)
 
-	// Bouton like/unlike
 	gestionnaireFavoris := service.ObtenirGestionnaireFavoris()
 	estFavori := gestionnaireFavoris.EstFavori(artiste.ID)
 
-	var btnLike *widget.Button
-	btnLike = widget.NewButton(map[bool]string{true: "💔 Retirer des favoris", false: "❤️ Ajouter aux favoris"}[estFavori], func() {
-		ajoute := gestionnaireFavoris.Basculer(artiste)
-		if ajoute {
-			btnLike.SetText("💔 Retirer des favoris")
+	btnFavori := widget.NewButton("", nil)
+	majTexteFavori := func() {
+		if estFavori {
+			btnFavori.SetText("💔 Retirer des favoris")
 		} else {
-			btnLike.SetText("❤️ Ajouter aux favoris")
+			btnFavori.SetText("❤️ Ajouter aux favoris")
 		}
-	})
+	}
+	majTexteFavori()
+	btnFavori.OnTapped = func() {
+		ajoute := gestionnaireFavoris.Basculer(artiste)
+		estFavori = ajoute
+		majTexteFavori()
+	}
 
-	// ✅ Bouton carte (corrigé)
 	btnCarte := widget.NewButton("🗺️ Voir sur la carte", func() {
 		markers, err := service.ConstruireMarkers(relation)
 		if err != nil {
@@ -84,50 +83,114 @@ func VueDetailsArtiste(
 		_ = fyne.CurrentApp().OpenURL(u)
 	})
 
-	// Bouton Spotify
-	btnSpotify := widget.NewButton("🎵 Écouter sur Spotify", func() {
-		// Utiliser le protocole spotify:// qui ouvre l'application Spotify
-		searchQuery := url.QueryEscape(artiste.Nom)
-		spotifyURL := "spotify:search:" + searchQuery
-
-		u, err := url.Parse(spotifyURL)
+	btnSpotify := widget.NewButton("🎵 Spotify", func() {
+		query := url.QueryEscape(artiste.Nom)
+		u, err := url.Parse("spotify:search:" + query)
 		if err != nil {
 			dialog.ShowError(err, fenetre)
 			return
 		}
-
 		_ = fyne.CurrentApp().OpenURL(u)
 	})
 
-	titre := widget.NewLabelWithStyle(
-		artiste.Nom,
-		fyne.TextAlignLeading,
-		fyne.TextStyle{Bold: true},
+	barreBoutons := container.NewHBox(btnRetour, btnFavori, btnCarte, btnSpotify)
+
+	// -------------------------
+	// Blocs (cartes)
+	// -------------------------
+	card := func(titre string, contenu fyne.CanvasObject) fyne.CanvasObject {
+		return widget.NewCard(titre, "", contenu)
+	}
+
+	// Bloc Artiste
+	lblNom := widget.NewLabelWithStyle(artiste.Nom, fyne.TextAlignLeading, fyne.TextStyle{Bold: true})
+	blocArtiste := card("Artiste", container.NewVBox(lblNom))
+
+	// Bloc Informations
+	info1 := widget.NewLabel(fmt.Sprintf("📅 Année de création : %d", artiste.AnneeCreation))
+	info2 := widget.NewLabel(fmt.Sprintf("💿 Premier album : %s", artiste.PremierAlbum))
+	blocInfos := card("Informations", container.NewVBox(info1, info2))
+
+	// Bloc Membres (en 2 colonnes pour être plus propre)
+	membresTexte := strings.Join(artiste.Membres, ", ")
+	lblMembres := widget.NewLabel(membresTexte)
+	lblMembres.Wrapping = fyne.TextWrapWord
+	blocMembres := card("Membres", lblMembres)
+
+	// -------------------------
+	// Bloc Concerts (cartes par lieu)
+	// -------------------------
+	// Trier les lieux
+	lieux := make([]string, 0, len(relation.DatesParLieu))
+	for lieu := range relation.DatesParLieu {
+		lieux = append(lieux, lieu)
+	}
+	sort.Strings(lieux)
+
+	// Création des "cartes concert"
+	cartes := make([]fyne.CanvasObject, 0, len(lieux))
+
+	const maxTitreLieu = 22     // limite pour éviter débordement
+	const maxDatesAffichees = 6 // limite pour éviter une carte gigantesque
+
+	for _, lieu := range lieux {
+		dates := relation.DatesParLieu[lieu]
+
+		// Titre contenu dans la carte (tronqué + wrap)
+		titreLieu := widget.NewLabelWithStyle("📍 "+tronquer(lieu, maxTitreLieu), fyne.TextAlignLeading, fyne.TextStyle{Bold: true})
+		titreLieu.Wrapping = fyne.TextWrapWord
+
+		nb := widget.NewLabel(fmt.Sprintf("%d date(s)", len(dates)))
+
+		// Afficher seulement quelques dates, sinon le bloc explose
+		limite := dates
+		if len(dates) > maxDatesAffichees {
+			limite = dates[:maxDatesAffichees]
+		}
+
+		listeDates := container.NewVBox()
+		for _, d := range limite {
+			listeDates.Add(widget.NewLabel("• " + d))
+		}
+
+		if len(dates) > maxDatesAffichees {
+			restant := len(dates) - maxDatesAffichees
+			listeDates.Add(widget.NewLabel(fmt.Sprintf("… +%d autre(s)", restant)))
+		}
+
+		contenu := container.NewVBox(
+			titreLieu,
+			widget.NewSeparator(),
+			nb,
+			widget.NewSeparator(),
+			listeDates,
+		)
+
+		// La carte elle-même
+		cartes = append(cartes, widget.NewCard("", "", contenu))
+	}
+
+	var blocConcerts fyne.CanvasObject
+	if len(cartes) == 0 {
+		blocConcerts = card("Concerts", widget.NewLabel("Aucun concert trouvé."))
+	} else {
+		// Grid 3 colonnes (propre sur écran large)
+		grille := container.NewGridWithColumns(3, cartes...)
+		blocConcerts = card("Concerts", grille)
+	}
+
+	// -------------------------
+	// Mise en page globale
+	// -------------------------
+	ligneHaut := container.NewGridWithColumns(2, blocArtiste, blocInfos)
+
+	page := container.NewVBox(
+		barreBoutons,
+		ligneHaut,
+		blocMembres,
+		blocConcerts,
 	)
 
-	infos := widget.NewLabel(
-		fmt.Sprintf("Création : %d | Premier album : %s",
-			artiste.AnneeCreation,
-			artiste.PremierAlbum,
-		),
-	)
-
-	membres := widget.NewLabel("Membres : " + fmt.Sprint(artiste.Membres))
-
-	concerts := widget.NewMultiLineEntry()
-	concerts.SetText(texteConcerts)
-	concerts.Disable()
-
-	haut := container.NewVBox(
-		container.NewHBox(btnRetour, btnLike, btnCarte, btnSpotify),
-		titre,
-		infos,
-		membres,
-	)
-
-	return container.NewBorder(
-		haut,
-		nil, nil, nil,
-		container.NewScroll(concerts),
-	)
+	// Scroll global (pas de scroll interne dans les concerts)
+	return container.NewVScroll(page)
 }

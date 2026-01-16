@@ -1,6 +1,8 @@
 package interfacegraphique
 
 import (
+	"fmt"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -10,6 +12,29 @@ import (
 	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/widget"
 )
+
+// extrait l'année d'une date "DD-MM-YYYY" ou "YYYY-MM-DD" ou "YYYY"
+func extraireAnnee(texte string) int {
+	texte = strings.TrimSpace(texte)
+	if len(texte) >= 4 {
+		parties := strings.FieldsFunc(texte, func(r rune) bool {
+			return r == '-' || r == '/' || r == '.'
+		})
+
+		for _, p := range parties {
+			if len(p) == 4 {
+				if y, err := strconv.Atoi(p); err == nil {
+					return y
+				}
+			}
+		}
+
+		if y, err := strconv.Atoi(texte[:4]); err == nil {
+			return y
+		}
+	}
+	return 0
+}
 
 func VueAccueil(
 	artistes []modele.Artiste,
@@ -73,21 +98,29 @@ func VueAccueil(
 	}
 
 	// -------------------------
-	// Bouton charger lieux
+	// Chargement lieux : label + progressbar (sans changer de vue)
 	// -------------------------
 	etat := widget.NewLabel("")
+	barre := widget.NewProgressBar()
+	barre.Hide()
 
 	var btnChargerLieux *widget.Button
 	btnChargerLieux = widget.NewButton("Charger les lieux (recherche avancée)", func() {
 		if onChargerLieux == nil {
 			return
 		}
+
 		btnChargerLieux.Disable()
 		etat.SetText("Chargement des lieux…")
+		barre.SetValue(0)
+		barre.Show()
 
 		onChargerLieux(
 			func(fait, total int) {
-				etat.SetText("Indexation : " + strconv.Itoa(fait) + "/" + strconv.Itoa(total))
+				etat.SetText(fmt.Sprintf("Indexation : %d/%d", fait, total))
+				if total > 0 {
+					barre.SetValue(float64(fait) / float64(total))
+				}
 			},
 			func(err error) {
 				btnChargerLieux.Enable()
@@ -101,7 +134,7 @@ func VueAccueil(
 	})
 
 	// -------------------------
-	// FILTRES DE TRI
+	// TRI
 	// -------------------------
 	selectTrierPar := widget.NewSelect([]string{"Artiste", "Membres", "Lieux", "Premier album", "Date de création"}, nil)
 	selectTrierPar.SetSelected("Artiste")
@@ -110,7 +143,27 @@ func VueAccueil(
 	selectOrdre.SetSelected("Croissant")
 
 	// -------------------------
-	// Fonction : applique TOUS les filtres + recherche
+	// FILTRES (range + checkbox)
+	// -------------------------
+	creationMin := widget.NewEntry()
+	creationMin.SetPlaceHolder("Création min (ex: 1990)")
+	creationMax := widget.NewEntry()
+	creationMax.SetPlaceHolder("Création max (ex: 2015)")
+
+	albumMin := widget.NewEntry()
+	albumMin.SetPlaceHolder("Album min (année)")
+	albumMax := widget.NewEntry()
+	albumMax.SetPlaceHolder("Album max (année)")
+
+	cb1 := widget.NewCheck("1", nil)
+	cb2 := widget.NewCheck("2", nil)
+	cb3 := widget.NewCheck("3", nil)
+	cb4plus := widget.NewCheck("4+", nil)
+
+	cbLieuxCharges := widget.NewCheck("Uniquement artistes avec lieux chargés", nil)
+
+	// -------------------------
+	// Fonction : applique TOUS les filtres + recherche + tri
 	// -------------------------
 	var appliquer func()
 
@@ -131,12 +184,84 @@ func VueAccueil(
 		}
 		listeSuggestions.Refresh()
 
-		// lieux via suggestions
+		// Parse ranges (si vide => pas de filtre)
+		toInt := func(s string) int {
+			s = strings.TrimSpace(s)
+			if s == "" {
+				return 0
+			}
+			v, err := strconv.Atoi(s)
+			if err != nil {
+				return -1
+			}
+			return v
+		}
+
+		cMin := toInt(creationMin.Text)
+		cMax := toInt(creationMax.Text)
+		aMin := toInt(albumMin.Text)
+		aMax := toInt(albumMax.Text)
+
+		filtreMembresActif := cb1.Checked || cb2.Checked || cb3.Checked || cb4plus.Checked
 		idsLieux := idsDepuisSuggestions(texte, "lieu")
 
-		// Filtrage artistes par recherche
+		// filtrage
 		artistesFiltres = artistesFiltres[:0]
 		for _, a := range artistes {
+
+			// filtre création
+			if cMin > 0 && a.AnneeCreation < cMin {
+				continue
+			}
+			if cMax > 0 && a.AnneeCreation > cMax {
+				continue
+			}
+
+			// filtre album (année)
+			anneeAlbum := extraireAnnee(a.PremierAlbum)
+			if aMin > 0 && anneeAlbum > 0 && anneeAlbum < aMin {
+				continue
+			}
+			if aMax > 0 && anneeAlbum > 0 && anneeAlbum > aMax {
+				continue
+			}
+
+			// filtre membres
+			if filtreMembresActif {
+				nb := len(a.Membres)
+				ok := false
+				if cb1.Checked && nb == 1 {
+					ok = true
+				}
+				if cb2.Checked && nb == 2 {
+					ok = true
+				}
+				if cb3.Checked && nb == 3 {
+					ok = true
+				}
+				if cb4plus.Checked && nb >= 4 {
+					ok = true
+				}
+				if !ok {
+					continue
+				}
+			}
+
+			// filtre "lieux chargés" (simple : si on a au moins une suggestion lieu pour cet artiste)
+			if cbLieuxCharges.Checked {
+				trouveLieu := false
+				for _, s := range suggestions {
+					if s.Type == "lieu" && s.ID == a.ID {
+						trouveLieu = true
+						break
+					}
+				}
+				if !trouveLieu {
+					continue
+				}
+			}
+
+			// recherche texte
 			if texte != "" {
 				nom := strings.ToLower(a.Nom)
 				creation := strconv.Itoa(a.AnneeCreation)
@@ -146,7 +271,6 @@ func VueAccueil(
 				if strings.Contains(nom, texte) {
 					trouve = true
 				}
-
 				if !trouve {
 					for _, m := range a.Membres {
 						if strings.Contains(strings.ToLower(m), texte) {
@@ -155,79 +279,90 @@ func VueAccueil(
 						}
 					}
 				}
-
 				if !trouve && strings.Contains(creation, texte) {
 					trouve = true
 				}
-
 				if !trouve && strings.Contains(premierAlbum, texte) {
 					trouve = true
 				}
-
 				if !trouve && idsLieux[a.ID] {
 					trouve = true
 				}
-
-				if trouve {
-					artistesFiltres = append(artistesFiltres, a)
+				if !trouve {
+					continue
 				}
-			} else {
-				artistesFiltres = append(artistesFiltres, a)
 			}
+
+			artistesFiltres = append(artistesFiltres, a)
 		}
 
-		// Tri (bubble sort)
+		// tri
 		trierPar := selectTrierPar.Selected
 		ordre := selectOrdre.Selected
 
-		for i := 0; i < len(artistesFiltres)-1; i++ {
-			for j := 0; j < len(artistesFiltres)-i-1; j++ {
-				echange := false
+		// utilitaire : compare string/int selon ordre
+		cmpStr := func(a, b string) bool {
+			a, b = strings.ToLower(a), strings.ToLower(b)
+			if ordre == "Croissant" {
+				return a < b
+			}
+			return a > b
+		}
+		cmpInt := func(a, b int) bool {
+			if ordre == "Croissant" {
+				return a < b
+			}
+			return a > b
+		}
 
-				switch trierPar {
-				case "Artiste":
-					a1, a2 := strings.ToLower(artistesFiltres[j].Nom), strings.ToLower(artistesFiltres[j+1].Nom)
-					echange = (ordre == "Croissant" && a1 > a2) || (ordre == "Décroissant" && a1 < a2)
-				case "Membres":
-					n1, n2 := len(artistesFiltres[j].Membres), len(artistesFiltres[j+1].Membres)
-					echange = (ordre == "Croissant" && n1 > n2) || (ordre == "Décroissant" && n1 < n2)
-				case "Lieux":
-					l1 := ""
-					l2 := ""
-					for _, s := range suggestions {
-						if s.Type == "lieu" && s.ID == artistesFiltres[j].ID {
-							l1 = strings.ToLower(s.Texte)
-							break
-						}
-					}
-					for _, s := range suggestions {
-						if s.Type == "lieu" && s.ID == artistesFiltres[j+1].ID {
-							l2 = strings.ToLower(s.Texte)
-							break
-						}
-					}
-					echange = (ordre == "Croissant" && l1 > l2) || (ordre == "Décroissant" && l1 < l2)
-				case "Premier album":
-					a1, a2 := strings.ToLower(artistesFiltres[j].PremierAlbum), strings.ToLower(artistesFiltres[j+1].PremierAlbum)
-					echange = (ordre == "Croissant" && a1 > a2) || (ordre == "Décroissant" && a1 < a2)
-				case "Date de création":
-					d1, d2 := artistesFiltres[j].AnneeCreation, artistesFiltres[j+1].AnneeCreation
-					echange = (ordre == "Croissant" && d1 > d2) || (ordre == "Décroissant" && d1 < d2)
-				}
-
-				if echange {
-					artistesFiltres[j], artistesFiltres[j+1] = artistesFiltres[j+1], artistesFiltres[j]
+		// récupère un "premier lieu" pour tri (simple)
+		premierLieu := func(id int) string {
+			for _, s := range suggestions {
+				if s.Type == "lieu" && s.ID == id {
+					return s.Texte
 				}
 			}
+			return ""
 		}
+
+		sort.SliceStable(artistesFiltres, func(i, j int) bool {
+			a1, a2 := artistesFiltres[i], artistesFiltres[j]
+			switch trierPar {
+			case "Artiste":
+				return cmpStr(a1.Nom, a2.Nom)
+			case "Membres":
+				return cmpInt(len(a1.Membres), len(a2.Membres))
+			case "Lieux":
+				return cmpStr(premierLieu(a1.ID), premierLieu(a2.ID))
+			case "Premier album":
+				return cmpStr(a1.PremierAlbum, a2.PremierAlbum)
+			case "Date de création":
+				return cmpInt(a1.AnneeCreation, a2.AnneeCreation)
+			default:
+				return cmpStr(a1.Nom, a2.Nom)
+			}
+		})
 
 		listeArtistes.Refresh()
 	}
 
-	// Branchements events
+	// -------------------------
+	// Events
+	// -------------------------
 	recherche.OnChanged = func(string) { appliquer() }
 	selectTrierPar.OnChanged = func(string) { appliquer() }
 	selectOrdre.OnChanged = func(string) { appliquer() }
+
+	creationMin.OnChanged = func(string) { appliquer() }
+	creationMax.OnChanged = func(string) { appliquer() }
+	albumMin.OnChanged = func(string) { appliquer() }
+	albumMax.OnChanged = func(string) { appliquer() }
+
+	cb1.OnChanged = func(bool) { appliquer() }
+	cb2.OnChanged = func(bool) { appliquer() }
+	cb3.OnChanged = func(bool) { appliquer() }
+	cb4plus.OnChanged = func(bool) { appliquer() }
+	cbLieuxCharges.OnChanged = func(bool) { appliquer() }
 
 	// -------------------------
 	// Layout
@@ -235,10 +370,18 @@ func VueAccueil(
 	titre := widget.NewLabelWithStyle("Artistes", fyne.TextAlignLeading, fyne.TextStyle{Bold: true})
 
 	filtresTri := container.NewGridWithColumns(2,
-		widget.NewLabel("Trier par :"),
-		selectTrierPar,
-		widget.NewLabel("Ordre :"),
-		selectOrdre,
+		widget.NewLabel("Trier par :"), selectTrierPar,
+		widget.NewLabel("Ordre :"), selectOrdre,
+	)
+
+	filtresRange := container.NewGridWithColumns(2,
+		creationMin, creationMax,
+		albumMin, albumMax,
+	)
+
+	filtresMembres := container.NewHBox(
+		widget.NewLabel("Membres :"),
+		cb1, cb2, cb3, cb4plus,
 	)
 
 	haut := container.NewVBox(
@@ -246,14 +389,19 @@ func VueAccueil(
 		recherche,
 		listeSuggestions,
 		widget.NewSeparator(),
+		widget.NewLabelWithStyle("Filtres", fyne.TextAlignLeading, fyne.TextStyle{Bold: true}),
+		filtresRange,
+		filtresMembres,
+		cbLieuxCharges,
+		widget.NewSeparator(),
 		widget.NewLabelWithStyle("Tri", fyne.TextAlignLeading, fyne.TextStyle{Bold: true}),
 		filtresTri,
 		widget.NewSeparator(),
 		btnChargerLieux,
+		barre,
 		etat,
 	)
 
-	// état initial : affiche tout
 	appliquer()
 
 	return container.NewBorder(haut, nil, nil, nil, listeArtistes)
