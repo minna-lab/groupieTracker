@@ -1,1 +1,30 @@
-.DS_Store
+# Binaires compilés
+*.exe
+*.dll
+*.so
+*.dylib
+
+# Fichiers de test
+*.test
+
+# Couverture de code
+*.out
+
+# Dépendances Go
+vendor/
+
+# Fichiers temporaires
+*.tmp
+*.log
+
+# Caches locaux
+cache_geocodage.json
+favoris.json
+carte.html
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
