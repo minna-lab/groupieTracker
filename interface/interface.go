@@ -102,7 +102,6 @@ func VueAccueil(
 	imagesArtistes map[int]fyne.Resource,
 	onSelection func(modele.Artiste),
 	suggestions []modele.Suggestion,
-	onChargerLieux func(progress func(fait, total int), fin func(err error)),
 ) fyne.CanvasObject {
 
 	artistesFiltres := make([]modele.Artiste, len(artistes))
@@ -187,27 +186,6 @@ func VueAccueil(
 		}
 		return res
 	}
-
-	etat := widget.NewLabel("")
-	var btnChargerLieux *widget.Button
-	btnChargerLieux = widget.NewButton("Charger les lieux (recherche avancée)", func() {
-		if onChargerLieux == nil {
-			return
-		}
-		btnChargerLieux.Disable()
-		etat.SetText("Chargement des lieux…")
-		onChargerLieux(
-			func(fait, total int) { etat.SetText(fmt.Sprintf("Indexation : %d/%d", fait, total)) },
-			func(err error) {
-				btnChargerLieux.Enable()
-				if err != nil {
-					etat.SetText("Erreur : " + err.Error())
-				} else {
-					etat.SetText("Lieux chargés ✅")
-				}
-			},
-		)
-	})
 
 	selectTrierPar := widget.NewSelect([]string{"Artiste", "Lieux", "Premier album", "Date de création"}, nil)
 	selectTrierPar.SetSelected("Artiste")
@@ -327,9 +305,6 @@ func VueAccueil(
 		widget.NewSeparator(),
 		widget.NewLabelWithStyle("Tri", fyne.TextAlignLeading, fyne.TextStyle{Bold: true}),
 		filtresTri,
-		widget.NewSeparator(),
-		btnChargerLieux,
-		etat,
 	)
 
 	appliquer()
