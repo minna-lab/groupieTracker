@@ -5,6 +5,8 @@ import (
 	interfacegraphique "groupie-tracker/interface"
 	"groupie-tracker/modele"
 	"groupie-tracker/service"
+	"io"
+	"net/http"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/app"
@@ -30,19 +32,34 @@ func main() {
 	}()
 
 	// Chargement initial
-	w.SetContent(interfacegraphique.VueChargement("Chargement", "Récupération des artistes…", nil))
-	w.Show()
+	w.SetContent(interfacegraphique.VueChargement("Chargement", "Récupération des artistes…", func() {}))
 
 	// Chargement des artistes en arrière-plan
 	go func() {
 		artistes, err := api.RecupererArtistes()
+		if err != nil {
+			ui <- func() {
+				w.SetContent(container.NewCenter(widget.NewLabel("Erreur : " + err.Error())))
+			}
+			return
+		}
+
+		// Précharger les images des artistes
+		imagesArtistes := make(map[int]fyne.Resource)
+		for _, artiste := range artistes {
+			if artiste.Image != "" {
+				resp, err := http.Get(artiste.Image)
+				if err == nil {
+					imgData, err := io.ReadAll(resp.Body)
+					resp.Body.Close()
+					if err == nil {
+						imagesArtistes[artiste.ID] = fyne.NewStaticResource("artiste", imgData)
+					}
+				}
+			}
+		}
 
 		ui <- func() {
-			if err != nil {
-				w.SetContent(container.NewCenter(widget.NewLabel("Erreur : " + err.Error())))
-				return
-			}
-
 			var vueAccueil fyne.CanvasObject
 			var onglets *container.AppTabs
 
@@ -83,6 +100,7 @@ func main() {
 				// Vue accueil artistes
 				vueAccueil = interfacegraphique.VueAccueil(
 					artistes,
+					imagesArtistes,
 
 					// clic artiste => détails
 					func(artiste modele.Artiste) {
