@@ -131,11 +131,21 @@ func VueAccueil(
 		anneeLabel := widget.NewLabel(fmt.Sprintf("(%d)", artiste.AnneeCreation))
 		anneeLabel.Alignment = fyne.TextAlignCenter
 
-		// Carte
-		carte := container.NewVBox(
+		// Contenu de la carte
+		contenuCarte := container.NewVBox(
 			img,
 			nomLabel,
 			anneeLabel,
+		)
+
+		// Fond gris pour la carte
+		bgCarte := canvas.NewRectangle(color.NRGBA{240, 240, 240, 255})
+		bgCarte.CornerRadius = 10
+
+		// Carte avec fond gris
+		carte := container.NewStack(
+			bgCarte,
+			container.NewPadded(contenuCarte),
 		)
 
 		// Bouton transparent pour le clic (sans effet de survol)
@@ -144,7 +154,7 @@ func VueAccueil(
 		})
 		btn.Importance = widget.LowImportance
 
-		// Stack simple sans carte qui crée l'ombre grise
+		// Stack avec bouton
 		return container.NewStack(
 			carte,
 			btn,
@@ -213,12 +223,17 @@ func VueAccueil(
 
 	selectTrierPar := widget.NewSelect([]string{"Artiste", "Lieux", "Premier album", "Date de création"}, nil)
 	selectTrierPar.SetSelected("Artiste")
-	selectOrdre := widget.NewSelect([]string{"Croissant", "Décroissant"}, nil)
-	selectOrdre.SetSelected("Croissant")
 
 	// Nouveau filtre pour le nombre de membres
 	selectNombreMembres := widget.NewSelect([]string{"Tous", "1", "2", "3", "4", "5+"}, nil)
 	selectNombreMembres.SetSelected("Tous")
+
+	// Nouveaux champs pour la plage d'années
+	entryAnneeMin := widget.NewEntry()
+	entryAnneeMin.SetPlaceHolder("Min (ex: 1990)")
+
+	entryAnneeMax := widget.NewEntry()
+	entryAnneeMax.SetPlaceHolder("Max (ex: 2020)")
 
 	var appliquer func()
 
@@ -239,6 +254,20 @@ func VueAccueil(
 		}
 		listeSuggestions.Refresh()
 
+		// Récupérer les valeurs de plage d'années
+		anneeMin := 0
+		anneeMax := 9999
+		if entryAnneeMin.Text != "" {
+			if val, err := strconv.Atoi(strings.TrimSpace(entryAnneeMin.Text)); err == nil {
+				anneeMin = val
+			}
+		}
+		if entryAnneeMax.Text != "" {
+			if val, err := strconv.Atoi(strings.TrimSpace(entryAnneeMax.Text)); err == nil {
+				anneeMax = val
+			}
+		}
+
 		// Filtrer artistes
 		idsLieux := idsDepuisSuggestions(texte, "lieu")
 		artistesFiltres = artistesFiltres[:0]
@@ -258,6 +287,11 @@ func VueAccueil(
 						continue
 					}
 				}
+			}
+
+			// Filtre par plage d'années
+			if a.AnneeCreation < anneeMin || a.AnneeCreation > anneeMax {
+				continue
 			}
 
 			// Filtre par texte
@@ -283,20 +317,20 @@ func VueAccueil(
 		}
 
 		// Tri bubble sort
-		trierPar, ordre := selectTrierPar.Selected, selectOrdre.Selected
+		trierPar := selectTrierPar.Selected
 		for i := 0; i < len(artistesFiltres)-1; i++ {
 			for j := 0; j < len(artistesFiltres)-i-1; j++ {
 				echange := false
 				switch trierPar {
 				case "Artiste":
 					a1, a2 := strings.ToLower(artistesFiltres[j].Nom), strings.ToLower(artistesFiltres[j+1].Nom)
-					echange = (ordre == "Croissant" && a1 > a2) || (ordre == "Décroissant" && a1 < a2)
+					echange = a1 > a2
 				case "Premier album":
 					a1, a2 := strings.ToLower(artistesFiltres[j].PremierAlbum), strings.ToLower(artistesFiltres[j+1].PremierAlbum)
-					echange = (ordre == "Croissant" && a1 > a2) || (ordre == "Décroissant" && a1 < a2)
+					echange = a1 > a2
 				case "Date de création":
 					d1, d2 := artistesFiltres[j].AnneeCreation, artistesFiltres[j+1].AnneeCreation
-					echange = (ordre == "Croissant" && d1 > d2) || (ordre == "Décroissant" && d1 < d2)
+					echange = d1 > d2
 				}
 				if echange {
 					artistesFiltres[j], artistesFiltres[j+1] = artistesFiltres[j+1], artistesFiltres[j]
@@ -308,8 +342,9 @@ func VueAccueil(
 
 	recherche.OnChanged = func(string) { appliquer() }
 	selectTrierPar.OnChanged = func(string) { appliquer() }
-	selectOrdre.OnChanged = func(string) { appliquer() }
 	selectNombreMembres.OnChanged = func(string) { appliquer() }
+	entryAnneeMin.OnChanged = func(string) { appliquer() }
+	entryAnneeMax.OnChanged = func(string) { appliquer() }
 
 	// =========================================================================
 	// COLONNE DE GAUCHE - FILTRES & RECHERCHE
@@ -320,10 +355,13 @@ func VueAccueil(
 	filtresTri := container.NewVBox(
 		widget.NewLabel("Trier par :"),
 		selectTrierPar,
-		widget.NewLabel("Ordre :"),
-		selectOrdre,
 		widget.NewLabel("Nombre de membres :"),
 		selectNombreMembres,
+		widget.NewLabel("Plage d'années :"),
+		container.NewGridWithColumns(2,
+			entryAnneeMin,
+			entryAnneeMax,
+		),
 	)
 
 	colonneGauche := container.NewVBox(
