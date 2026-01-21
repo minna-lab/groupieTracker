@@ -20,7 +20,7 @@ import (
 	"fyne.io/fyne/v2/widget"
 )
 
-// Theme personnalisé
+// Theme personnalisé en mode dark
 type ThemePerso struct{}
 
 func (ThemePerso) Color(name fyne.ThemeColorName, variant fyne.ThemeVariant) color.Color {
@@ -31,16 +31,17 @@ func (ThemePerso) Color(name fyne.ThemeColorName, variant fyne.ThemeVariant) col
 	if c, ok := colors[name]; ok {
 		return c
 	}
+	// Mode dark par défaut
 	if name == theme.ColorNameBackground {
-		return map[bool]color.Color{true: color.NRGBA{16, 16, 18, 255}, false: color.NRGBA{246, 247, 250, 255}}[variant == theme.VariantDark]
+		return color.NRGBA{16, 16, 18, 255}
 	}
 	if name == theme.ColorNameInputBackground {
-		return map[bool]color.Color{true: color.NRGBA{28, 28, 33, 255}, false: color.NRGBA{255, 255, 255, 255}}[variant == theme.VariantDark]
+		return color.NRGBA{28, 28, 33, 255}
 	}
 	if name == theme.ColorNameForeground {
-		return map[bool]color.Color{true: color.NRGBA{235, 235, 235, 255}, false: color.NRGBA{25, 25, 28, 255}}[variant == theme.VariantDark]
+		return color.NRGBA{235, 235, 235, 255}
 	}
-	return theme.DefaultTheme().Color(name, variant)
+	return theme.DefaultTheme().Color(name, theme.VariantDark)
 }
 
 func (ThemePerso) Font(style fyne.TextStyle) fyne.Resource {
@@ -138,11 +139,11 @@ func VueAccueil(
 			anneeLabel,
 		)
 
-		// Fond gris pour la carte
-		bgCarte := canvas.NewRectangle(color.NRGBA{240, 240, 240, 255})
+		// Fond sombre pour la carte
+		bgCarte := canvas.NewRectangle(color.NRGBA{40, 40, 45, 255})
 		bgCarte.CornerRadius = 10
 
-		// Carte avec fond gris
+		// Carte avec fond sombre
 		carte := container.NewStack(
 			bgCarte,
 			container.NewPadded(contenuCarte),
@@ -221,21 +222,117 @@ func VueAccueil(
 		return res
 	}
 
-	selectTrierPar := widget.NewSelect([]string{"Artiste", "Lieux", "Premier album", "Date de création"}, nil)
+	// --- Filtre à CASES : Nombre de membres (SIMPLIFIÉ) ---
+	labelNbMembres := widget.NewLabel("Membres :")
+	check1Membre := widget.NewCheck("1", nil)
+	check2Membres := widget.NewCheck("2", nil)
+	check3Membres := widget.NewCheck("3", nil)
+	check4Membres := widget.NewCheck("4", nil)
+	check5PlusMembres := widget.NewCheck("5+", nil)
+
+	// Disposition horizontale compacte
+	filtreNbMembres := container.NewVBox(
+		labelNbMembres,
+		container.NewGridWithColumns(5,
+			check1Membre,
+			check2Membres,
+			check3Membres,
+			check4Membres,
+			check5PlusMembres,
+		),
+	)
+
+	// --- Filtre PLAGE : Année de création ---
+	labelAnneeCreation := widget.NewLabel("Année de création :")
+	entryAnneeCreationMin := widget.NewEntry()
+	entryAnneeCreationMin.SetPlaceHolder("Min (ex: 1990)")
+	entryAnneeCreationMax := widget.NewEntry()
+	entryAnneeCreationMax.SetPlaceHolder("Max (ex: 2020)")
+
+	filtrePlageCreation := container.NewVBox(
+		labelAnneeCreation,
+		container.NewGridWithColumns(2,
+			entryAnneeCreationMin,
+			entryAnneeCreationMax,
+		),
+	)
+
+	// --- Filtre PLAGE : Premier album ---
+	labelPremierAlbum := widget.NewLabel("Premier album (année) :")
+	entryPremierAlbumMin := widget.NewEntry()
+	entryPremierAlbumMin.SetPlaceHolder("Min (ex: 2000)")
+	entryPremierAlbumMax := widget.NewEntry()
+	entryPremierAlbumMax.SetPlaceHolder("Max (ex: 2024)")
+
+	filtrePlagePremierAlbum := container.NewVBox(
+		labelPremierAlbum,
+		container.NewGridWithColumns(2,
+			entryPremierAlbumMin,
+			entryPremierAlbumMax,
+		),
+	)
+
+	// --- Filtre RECHERCHE : Lieux ---
+	labelLieux := widget.NewLabel("Lieux de concerts :")
+	entryLieux := widget.NewEntry()
+	entryLieux.SetPlaceHolder("Chercher un lieu...")
+
+	filtreRechercheLieux := container.NewVBox(
+		labelLieux,
+		entryLieux,
+	)
+
+	// --- Tri ---
+	labelTri := widget.NewLabel("Trier par :")
+	selectTrierPar := widget.NewSelect([]string{"Artiste", "Premier album", "Date de création"}, nil)
 	selectTrierPar.SetSelected("Artiste")
 
-	// Nouveau filtre pour le nombre de membres
-	selectNombreMembres := widget.NewSelect([]string{"Tous", "1", "2", "3", "4", "5+"}, nil)
-	selectNombreMembres.SetSelected("Tous")
-
-	// Nouveaux champs pour la plage d'années
-	entryAnneeMin := widget.NewEntry()
-	entryAnneeMin.SetPlaceHolder("Min (ex: 1990)")
-
-	entryAnneeMax := widget.NewEntry()
-	entryAnneeMax.SetPlaceHolder("Max (ex: 2020)")
+	filtreTri := container.NewVBox(
+		labelTri,
+		selectTrierPar,
+	)
 
 	var appliquer func()
+
+	// --- Bouton réinitialiser ---
+	btnReinitialiser := widget.NewButton("🔄 Réinitialiser les filtres", func() {
+		// Décocher toutes les cases
+		check1Membre.SetChecked(false)
+		check2Membres.SetChecked(false)
+		check3Membres.SetChecked(false)
+		check4Membres.SetChecked(false)
+		check5PlusMembres.SetChecked(false)
+
+		// Vider les champs de plage
+		entryAnneeCreationMin.SetText("")
+		entryAnneeCreationMax.SetText("")
+		entryPremierAlbumMin.SetText("")
+		entryPremierAlbumMax.SetText("")
+
+		// Vider la recherche de lieux
+		entryLieux.SetText("")
+
+		// Vider la recherche principale
+		recherche.SetText("")
+
+		// Réinitialiser le tri
+		selectTrierPar.SetSelected("Artiste")
+	})
+
+	// Assemblage de tous les filtres
+	tousLesFiltres := container.NewVBox(
+		filtreTri,
+		widget.NewSeparator(),
+		filtreNbMembres,
+		widget.NewSeparator(),
+		filtrePlageCreation,
+		widget.NewSeparator(),
+		filtrePlagePremierAlbum,
+		widget.NewSeparator(),
+		filtreRechercheLieux,
+		widget.NewSeparator(),
+		btnReinitialiser,
+	)
 
 	appliquer = func() {
 		texte := strings.ToLower(strings.TrimSpace(recherche.Text))
@@ -254,47 +351,117 @@ func VueAccueil(
 		}
 		listeSuggestions.Refresh()
 
-		// Récupérer les valeurs de plage d'années
-		anneeMin := 0
-		anneeMax := 9999
-		if entryAnneeMin.Text != "" {
-			if val, err := strconv.Atoi(strings.TrimSpace(entryAnneeMin.Text)); err == nil {
-				anneeMin = val
+		// --- Récupérer les filtres de plage année création ---
+		anneeCreationMin := 0
+		anneeCreationMax := 9999
+		if entryAnneeCreationMin.Text != "" {
+			if val, err := strconv.Atoi(strings.TrimSpace(entryAnneeCreationMin.Text)); err == nil {
+				anneeCreationMin = val
 			}
 		}
-		if entryAnneeMax.Text != "" {
-			if val, err := strconv.Atoi(strings.TrimSpace(entryAnneeMax.Text)); err == nil {
-				anneeMax = val
+		if entryAnneeCreationMax.Text != "" {
+			if val, err := strconv.Atoi(strings.TrimSpace(entryAnneeCreationMax.Text)); err == nil {
+				anneeCreationMax = val
 			}
 		}
+
+		// --- Récupérer les filtres de plage premier album ---
+		// Extraction de l'année depuis la chaîne "DD-MM-YYYY"
+		extraireAnnee := func(dateStr string) int {
+			parts := strings.Split(dateStr, "-")
+			if len(parts) == 3 {
+				annee, err := strconv.Atoi(parts[2])
+				if err == nil {
+					return annee
+				}
+			}
+			return 0
+		}
+
+		premierAlbumMin := 0
+		premierAlbumMax := 9999
+		if entryPremierAlbumMin.Text != "" {
+			if val, err := strconv.Atoi(strings.TrimSpace(entryPremierAlbumMin.Text)); err == nil {
+				premierAlbumMin = val
+			}
+		}
+		if entryPremierAlbumMax.Text != "" {
+			if val, err := strconv.Atoi(strings.TrimSpace(entryPremierAlbumMax.Text)); err == nil {
+				premierAlbumMax = val
+			}
+		}
+
+		// --- Récupérer filtre recherche lieux ---
+		lieutexte := strings.ToLower(strings.TrimSpace(entryLieux.Text))
+		idsLieuxFiltre := make(map[int]bool)
+		if lieutexte != "" {
+			for _, s := range suggestions {
+				if s.Type == "lieu" && strings.Contains(strings.ToLower(s.Texte), lieutexte) {
+					idsLieuxFiltre[s.ID] = true
+				}
+			}
+		}
+
+		// --- Récupérer filtres cases à cocher (nombre de membres) ---
+		membresVoulus := make(map[int]bool)
+		if check1Membre.Checked {
+			membresVoulus[1] = true
+		}
+		if check2Membres.Checked {
+			membresVoulus[2] = true
+		}
+		if check3Membres.Checked {
+			membresVoulus[3] = true
+		}
+		if check4Membres.Checked {
+			membresVoulus[4] = true
+		}
+		if check5PlusMembres.Checked {
+			membresVoulus[5] = true // 5 ou plus
+		}
+		// Si aucune case cochée, on accepte tous les nombres de membres
+		accepterTousMembres := len(membresVoulus) == 0
 
 		// Filtrer artistes
 		idsLieux := idsDepuisSuggestions(texte, "lieu")
 		artistesFiltres = artistesFiltres[:0]
-		nombreMembres := selectNombreMembres.Selected
 
 		for _, a := range artistes {
-			// Filtre par nombre de membres
-			if nombreMembres != "Tous" {
+			// --- Filtre nombre de membres (cases à cocher) ---
+			if !accepterTousMembres {
 				nbMembres := len(a.Membres)
-				if nombreMembres == "5+" {
-					if nbMembres < 5 {
-						continue
-					}
-				} else {
-					nbVoulu, _ := strconv.Atoi(nombreMembres)
-					if nbMembres != nbVoulu {
-						continue
-					}
+				trouve := false
+				if nbMembres >= 5 && membresVoulus[5] {
+					trouve = true
+				} else if membresVoulus[nbMembres] {
+					trouve = true
+				}
+				if !trouve {
+					continue
 				}
 			}
 
-			// Filtre par plage d'années
-			if a.AnneeCreation < anneeMin || a.AnneeCreation > anneeMax {
+			// --- Filtre plage année de création ---
+			if a.AnneeCreation < anneeCreationMin || a.AnneeCreation > anneeCreationMax {
 				continue
 			}
 
-			// Filtre par texte
+			// --- Filtre plage premier album ---
+			anneeAlbum := extraireAnnee(a.PremierAlbum)
+			if anneeAlbum != 0 {
+				if anneeAlbum < premierAlbumMin || anneeAlbum > premierAlbumMax {
+					continue
+				}
+			}
+
+			// --- Filtre recherche lieux ---
+			if lieutexte != "" {
+				if !idsLieuxFiltre[a.ID] {
+					continue
+				}
+			}
+
+			// --- Filtre texte recherche générale ---
 			if texte == "" {
 				artistesFiltres = append(artistesFiltres, a)
 				continue
@@ -340,11 +507,25 @@ func VueAccueil(
 		rafraichirGrille()
 	}
 
+	// Connecter tous les événements OnChanged
 	recherche.OnChanged = func(string) { appliquer() }
 	selectTrierPar.OnChanged = func(string) { appliquer() }
-	selectNombreMembres.OnChanged = func(string) { appliquer() }
-	entryAnneeMin.OnChanged = func(string) { appliquer() }
-	entryAnneeMax.OnChanged = func(string) { appliquer() }
+
+	// Cases à cocher
+	check1Membre.OnChanged = func(bool) { appliquer() }
+	check2Membres.OnChanged = func(bool) { appliquer() }
+	check3Membres.OnChanged = func(bool) { appliquer() }
+	check4Membres.OnChanged = func(bool) { appliquer() }
+	check5PlusMembres.OnChanged = func(bool) { appliquer() }
+
+	// Plages
+	entryAnneeCreationMin.OnChanged = func(string) { appliquer() }
+	entryAnneeCreationMax.OnChanged = func(string) { appliquer() }
+	entryPremierAlbumMin.OnChanged = func(string) { appliquer() }
+	entryPremierAlbumMax.OnChanged = func(string) { appliquer() }
+
+	// Recherche lieux
+	entryLieux.OnChanged = func(string) { appliquer() }
 
 	// =========================================================================
 	// COLONNE DE GAUCHE - FILTRES & RECHERCHE
@@ -352,24 +533,13 @@ func VueAccueil(
 	titreRecherche := widget.NewLabelWithStyle("🔍 Recherche", fyne.TextAlignLeading, fyne.TextStyle{Bold: true})
 	titreFiltres := widget.NewLabelWithStyle("⚙️ Filtres", fyne.TextAlignLeading, fyne.TextStyle{Bold: true})
 
-	filtresTri := container.NewVBox(
-		widget.NewLabel("Trier par :"),
-		selectTrierPar,
-		widget.NewLabel("Nombre de membres :"),
-		selectNombreMembres,
-		widget.NewLabel("Plage d'années :"),
-		container.NewGridWithColumns(2,
-			entryAnneeMin,
-			entryAnneeMax,
-		),
-	)
-
 	colonneGauche := container.NewVBox(
 		titreRecherche,
 		recherche,
 		listeSuggestions,
+		widget.NewSeparator(),
 		titreFiltres,
-		filtresTri,
+		tousLesFiltres,
 	)
 
 	// Mettre la colonne gauche dans un scroll pour éviter débordement
@@ -377,8 +547,18 @@ func VueAccueil(
 	colonneGaucheScroll.SetMinSize(fyne.NewSize(300, 0))
 
 	// Fond sombre pour la colonne de gauche
-	bgColonneGauche := canvas.NewRectangle(color.NRGBA{240, 240, 240, 255})
+	bgColonneGauche := canvas.NewRectangle(color.NRGBA{25, 25, 30, 255})
 	colonneGaucheAvecBg := container.NewStack(bgColonneGauche, colonneGaucheScroll)
+
+	// =========================================================================
+	// EN-TÊTE AVEC TITRE GROUPIE TRACKER
+	// =========================================================================
+	titreGroupieTracker := canvas.NewText("🎸 GROUPIE TRACKER", theme.Color(theme.ColorNameForeground))
+	titreGroupieTracker.TextStyle = fyne.TextStyle{Bold: true}
+	titreGroupieTracker.TextSize = 32
+	titreGroupieTracker.Alignment = fyne.TextAlignCenter
+
+	enTeteGlobal := container.NewCenter(titreGroupieTracker)
 
 	// =========================================================================
 	// COLONNE DE DROITE - LISTE DES ARTISTES
@@ -401,16 +581,23 @@ func VueAccueil(
 	colonneDroite := container.NewBorder(enTeteDroite, nil, nil, nil, scrollGrille)
 
 	// =========================================================================
-	// ASSEMBLAGE FINAL - 2 COLONNES SANS BARRE DE SÉPARATION
+	// ASSEMBLAGE FINAL - 2 COLONNES AVEC EN-TÊTE
 	// =========================================================================
 	appliquer()
 
-	// Container simple sans barre de séparation
-	layoutFinal := container.NewBorder(
+	// Container avec colonnes
+	contenuPrincipal := container.NewBorder(
 		nil, nil,
 		colonneGaucheAvecBg,
 		nil,
 		colonneDroite,
+	)
+
+	// Layout final avec en-tête en haut
+	layoutFinal := container.NewBorder(
+		enTeteGlobal,
+		nil, nil, nil,
+		contenuPrincipal,
 	)
 
 	return layoutFinal
