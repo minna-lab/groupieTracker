@@ -7,7 +7,8 @@ import (
 	"net/http"
 )
 
-// Client HTTP générique pour récupérer les données JSON
+// RecupererJSON effectue une requête HTTP GET et décode la réponse JSON dans la cible fournie
+// Gère les erreurs HTTP et de décodage de manière uniforme
 func RecupererJSON(url string, cible interface{}) error {
 	reponse, err := http.Get(url)
 	if err != nil {
@@ -27,7 +28,8 @@ func RecupererJSON(url string, cible interface{}) error {
 	return nil
 }
 
-// Récupération des artistes
+// RecupererArtistes récupère la liste complète des artistes depuis l'API Groupie Tracker
+// Retourne un tableau d'artistes avec leurs informations (nom, membres, année, etc.)
 func RecupererArtistes() ([]modele.Artiste, error) {
 	var artistes []modele.Artiste
 	err := RecupererJSON(
@@ -37,7 +39,8 @@ func RecupererArtistes() ([]modele.Artiste, error) {
 	return artistes, err
 }
 
-// Récupération des relations pour un artiste
+// RecupererRelation récupère les dates de concerts et lieux pour un artiste spécifique
+// Prend l'ID de l'artiste et retourne une map associant chaque lieu à ses dates de concert
 func RecupererRelation(id int) (modele.Relation, error) {
 	var relation modele.Relation
 	err := RecupererJSON(
