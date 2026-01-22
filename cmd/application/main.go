@@ -35,6 +35,19 @@ func main() {
 			return
 		}
 
+		// Charger toutes les relations en parallèle pour le filtrage par lieu
+		var wgRelations sync.WaitGroup
+		for _, artiste := range artistes {
+			wgRelations.Add(1)
+			go func(id int) {
+				defer wgRelations.Done()
+				if rel, err := api.RecupererRelation(id); err == nil {
+					cache.Set(id, rel)
+				}
+			}(artiste.ID)
+		}
+		wgRelations.Wait()
+
 		imagesArtistes := make(map[int]fyne.Resource)
 		var mu sync.Mutex
 		var vueAccueil *fyne.Container
