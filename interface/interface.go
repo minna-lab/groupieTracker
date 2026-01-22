@@ -46,6 +46,15 @@ func tronquer(texte string, max int) string {
 	return texte[:max-1] + "…"
 }
 
+// genererCarteGoogleMaps crée une URL OpenStreetMap interactive pour un lieu
+func genererCarteGoogleMaps(lieu string) string {
+	// URL OpenStreetMap avec le lieu comme marqueur
+	// Format: https://www.openstreetmap.org/search?query=lieu
+	mapsURL := "https://www.openstreetmap.org/search?query=" + url.QueryEscape(lieu)
+
+	return mapsURL
+}
+
 func Carte(contenu fyne.CanvasObject) fyne.CanvasObject {
 	bg := canvas.NewRectangle(theme.Color(theme.ColorNameInputBackground))
 	bg.CornerRadius = 14
@@ -209,7 +218,7 @@ func VueAccueil(
 	entryLieux := widget.NewEntry()
 	entryLieux.SetPlaceHolder("Chercher un lieu...")
 	filtreRechercheLieux := container.NewVBox(widget.NewLabel("Lieux de concerts :"), entryLieux)
-	selectTrierPar := widget.NewSelect([]string{"Artiste", "Date de création"}, nil)
+	selectTrierPar := widget.NewSelect([]string{"Artiste", "Date de premier album"}, nil)
 	selectTrierPar.SetSelected("Artiste")
 	filtreTri := container.NewVBox(widget.NewLabel("Trier par :"), selectTrierPar)
 
@@ -337,8 +346,9 @@ func VueAccueil(
 				case "Artiste":
 					a1, a2 := strings.ToLower(artistesFiltres[j].Nom), strings.ToLower(artistesFiltres[j+1].Nom)
 					echange = a1 > a2
-				case "Date de création":
-					echange = artistesFiltres[j].AnneeCreation > artistesFiltres[j+1].AnneeCreation
+				case "Date de premier album":
+					a1, a2 := strings.ToLower(artistesFiltres[j].PremierAlbum), strings.ToLower(artistesFiltres[j+1].PremierAlbum)
+					echange = a1 > a2
 				}
 				if echange {
 					artistesFiltres[j], artistesFiltres[j+1] = artistesFiltres[j+1], artistesFiltres[j]
@@ -420,7 +430,6 @@ func VueDetailsArtiste(
 	lblMembres.Wrapping = fyne.TextWrapWord
 	blocMembres := card("Membres", lblMembres)
 
-	// -------------------------
 	// Bloc Concerts (cartes par lieu)
 	// -------------------------
 	// Trier les lieux
@@ -439,9 +448,30 @@ func VueDetailsArtiste(
 	for _, lieu := range lieux {
 		dates := relation.DatesParLieu[lieu]
 
-		// Titre contenu dans la carte (tronqué + wrap)
-		titreLieu := widget.NewLabelWithStyle("📍 "+tronquer(lieu, maxTitreLieu), fyne.TextAlignLeading, fyne.TextStyle{Bold: true})
-		titreLieu.Wrapping = fyne.TextWrapWord
+		// Créer un texte coloré pour le lieu
+		texteLieu := canvas.NewText("📍 "+tronquer(lieu, maxTitreLieu), color.NRGBA{34, 139, 230, 255})
+		texteLieu.TextStyle = fyne.TextStyle{Bold: true}
+		texteLieu.TextSize = 14
+
+		// Bouton pour le lieu qui ouvre OpenStreetMap interactive
+		btnLieu := widget.NewButton("", func(lieuCopie string) func() {
+			return func() {
+				// Générer l'URL OpenStreetMap interactive
+				mapsURL := genererCarteGoogleMaps(lieuCopie)
+
+				// Ouvrir l'URL dans le navigateur par défaut
+				if u, err := url.Parse(mapsURL); err == nil {
+					_ = fyne.CurrentApp().OpenURL(u)
+				}
+			}
+		}(lieu))
+		btnLieu.Importance = widget.LowImportance
+
+		// Créer un conteneur avec le texte coloré et le bouton
+		btnWithText := container.NewStack(
+			texteLieu,
+			btnLieu,
+		)
 
 		nb := widget.NewLabel(fmt.Sprintf("%d date(s)", len(dates)))
 
@@ -461,28 +491,12 @@ func VueDetailsArtiste(
 			listeDates.Add(widget.NewLabel(fmt.Sprintf("… +%d autre(s)", restant)))
 		}
 
-		// Bouton pour ouvrir sur Google Maps
-		btnMaps := widget.NewButton("🗺️ Voir sur Maps", func(lieuCopie string) func() {
-			return func() {
-				// Créer une URL Google Maps avec le lieu
-				query := url.QueryEscape(lieuCopie)
-				mapsURL := "https://www.google.com/maps/search/?api=1&query=" + query
-				u, err := url.Parse(mapsURL)
-				if err == nil {
-					_ = fyne.CurrentApp().OpenURL(u)
-				}
-			}
-		}(lieu))
-		btnMaps.Importance = widget.LowImportance
-
 		contenu := container.NewVBox(
-			titreLieu,
+			btnWithText,
 			widget.NewSeparator(),
 			nb,
 			widget.NewSeparator(),
 			listeDates,
-			widget.NewSeparator(),
-			btnMaps,
 		)
 
 		// La carte elle-même
