@@ -26,7 +26,6 @@ func (c *CacheRelations) Get(id int) (modele.Relation, bool) {
 	rel, ok := c.data[id]
 	return rel, ok
 }
-
 func (c *CacheRelations) Set(id int, rel modele.Relation) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -70,7 +69,6 @@ func (g *GestionnaireFavoris) EstFavori(id int) bool {
 	_, existe := g.favoris[id]
 	return existe
 }
-
 func (g *GestionnaireFavoris) Basculer(artiste modele.Artiste) bool {
 	g.mutex.Lock()
 	defer g.mutex.Unlock()
@@ -99,7 +97,6 @@ func (g *GestionnaireFavoris) sauvegarder() {
 		os.WriteFile(g.fichier, data, 0644)
 	}
 }
-
 func (g *GestionnaireFavoris) charger() {
 	if data, err := os.ReadFile(g.fichier); err == nil {
 		json.Unmarshal(data, &g.favoris)
@@ -128,7 +125,6 @@ func ConstruireSuggestions(artistes []modele.Artiste, cache *CacheRelations) []m
 			ajouter(m, "membre", a.ID)
 		}
 		ajouter(strconv.Itoa(a.AnneeCreation), "année de création", a.ID)
-		ajouter(a.PremierAlbum, "premier album", a.ID)
 		if cache != nil {
 			if rel, ok := cache.Get(a.ID); ok {
 				for lieu := range rel.DatesParLieu {
