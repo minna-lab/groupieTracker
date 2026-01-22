@@ -31,6 +31,13 @@ type Coordonnees struct {
 	Lon float64 `json:"lon"`
 }
 
+// Concert représente un événement avec son lieu et ses informations géographiques
+type Concert struct {
+	Lieu        string
+	Dates       []string
+	Coordonnees *Coordonnees // Peut être nil si les coordonnées ne sont pas disponibles
+}
+
 // Suggestion pour l'autocomplétion
 type Suggestion struct {
 	Texte string // ex: "Phil Collins"
