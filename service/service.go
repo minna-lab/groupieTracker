@@ -1,3 +1,4 @@
+// service.go
 package service
 
 import (
@@ -26,6 +27,7 @@ func (c *CacheRelations) Get(id int) (modele.Relation, bool) {
 	rel, ok := c.data[id]
 	return rel, ok
 }
+
 func (c *CacheRelations) Set(id int, rel modele.Relation) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -69,6 +71,7 @@ func (g *GestionnaireFavoris) EstFavori(id int) bool {
 	_, existe := g.favoris[id]
 	return existe
 }
+
 func (g *GestionnaireFavoris) Basculer(artiste modele.Artiste) bool {
 	g.mutex.Lock()
 	defer g.mutex.Unlock()
@@ -94,12 +97,13 @@ func (g *GestionnaireFavoris) ObtenirFavoris() []modele.Artiste {
 
 func (g *GestionnaireFavoris) sauvegarder() {
 	if data, err := json.MarshalIndent(g.favoris, "", "  "); err == nil {
-		os.WriteFile(g.fichier, data, 0644)
+		_ = os.WriteFile(g.fichier, data, 0644)
 	}
 }
+
 func (g *GestionnaireFavoris) charger() {
 	if data, err := os.ReadFile(g.fichier); err == nil {
-		json.Unmarshal(data, &g.favoris)
+		_ = json.Unmarshal(data, &g.favoris)
 	}
 }
 
@@ -113,18 +117,36 @@ func normaliserLieu(lieu string) string {
 func ConstruireSuggestions(artistes []modele.Artiste, cache *CacheRelations) []modele.Suggestion {
 	vu := make(map[string]bool)
 	var res []modele.Suggestion
+
 	ajouter := func(texte, typ string, id int) {
-		if cle := strings.ToLower(texte) + "|" + typ; texte != "" && !vu[cle] {
-			vu[cle] = true
-			res = append(res, modele.Suggestion{texte, typ, id})
+		texte = strings.TrimSpace(texte)
+		if texte == "" {
+			return
 		}
+		cle := strings.ToLower(texte) + "|" + typ
+		if vu[cle] {
+			return
+		}
+		vu[cle] = true
+		res = append(res, modele.Suggestion{Texte: texte, Type: typ, ID: id})
 	}
+
 	for _, a := range artistes {
 		ajouter(a.Nom, "artiste", a.ID)
+
 		for _, m := range a.Membres {
 			ajouter(m, "membre", a.ID)
 		}
+
 		ajouter(strconv.Itoa(a.AnneeCreation), "année de création", a.ID)
+
+		// suggestion sur la date du 1er album
+
+		if strings.TrimSpace(a.PremierAlbum) != "" {
+			ajouter(a.PremierAlbum, "1er album", a.ID)
+		}
+
+		// Suggestions de lieux via les relations (si le cache est fourni)
 		if cache != nil {
 			if rel, ok := cache.Get(a.ID); ok {
 				for lieu := range rel.DatesParLieu {
@@ -133,5 +155,6 @@ func ConstruireSuggestions(artistes []modele.Artiste, cache *CacheRelations) []m
 			}
 		}
 	}
+
 	return res
 }
