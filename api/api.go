@@ -7,25 +7,16 @@ import (
 	"net/http"
 )
 
-// RecupererJSON effectue une requête HTTP GET et décode la réponse JSON dans la cible fournie
-// Gère les erreurs HTTP et de décodage de manière uniforme
 func RecupererJSON(url string, cible interface{}) error {
 	reponse, err := http.Get(url)
 	if err != nil {
 		return err
 	}
 	defer reponse.Body.Close()
-
 	if reponse.StatusCode != http.StatusOK {
 		return fmt.Errorf("erreur HTTP : %s", reponse.Status)
 	}
-
-	err = json.NewDecoder(reponse.Body).Decode(cible)
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return json.NewDecoder(reponse.Body).Decode(cible)
 }
 
 // RecupererArtistes récupère la liste complète des artistes depuis l'API Groupie Tracker

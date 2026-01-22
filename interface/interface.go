@@ -257,21 +257,6 @@ func VueAccueil(
 		),
 	)
 
-	// --- Filtre PLAGE : Premier album ---
-	labelPremierAlbum := widget.NewLabel("Premier album (année) :")
-	entryPremierAlbumMin := widget.NewEntry()
-	entryPremierAlbumMin.SetPlaceHolder("Min (ex: 2000)")
-	entryPremierAlbumMax := widget.NewEntry()
-	entryPremierAlbumMax.SetPlaceHolder("Max (ex: 2024)")
-
-	filtrePlagePremierAlbum := container.NewVBox(
-		labelPremierAlbum,
-		container.NewGridWithColumns(2,
-			entryPremierAlbumMin,
-			entryPremierAlbumMax,
-		),
-	)
-
 	// --- Filtre RECHERCHE : Lieux ---
 	labelLieux := widget.NewLabel("Lieux de concerts :")
 	entryLieux := widget.NewEntry()
@@ -284,7 +269,7 @@ func VueAccueil(
 
 	// --- Tri ---
 	labelTri := widget.NewLabel("Trier par :")
-	selectTrierPar := widget.NewSelect([]string{"Artiste", "Premier album", "Date de création"}, nil)
+	selectTrierPar := widget.NewSelect([]string{"Artiste", "Date de création"}, nil)
 	selectTrierPar.SetSelected("Artiste")
 
 	filtreTri := container.NewVBox(
@@ -306,8 +291,6 @@ func VueAccueil(
 		// Vider les champs de plage
 		entryAnneeCreationMin.SetText("")
 		entryAnneeCreationMax.SetText("")
-		entryPremierAlbumMin.SetText("")
-		entryPremierAlbumMax.SetText("")
 
 		// Vider la recherche de lieux
 		entryLieux.SetText("")
@@ -326,8 +309,6 @@ func VueAccueil(
 		filtreNbMembres,
 		widget.NewSeparator(),
 		filtrePlageCreation,
-		widget.NewSeparator(),
-		filtrePlagePremierAlbum,
 		widget.NewSeparator(),
 		filtreRechercheLieux,
 		widget.NewSeparator(),
@@ -362,32 +343,6 @@ func VueAccueil(
 		if entryAnneeCreationMax.Text != "" {
 			if val, err := strconv.Atoi(strings.TrimSpace(entryAnneeCreationMax.Text)); err == nil {
 				anneeCreationMax = val
-			}
-		}
-
-		// --- Récupérer les filtres de plage premier album ---
-		// Extraction de l'année depuis la chaîne "DD-MM-YYYY"
-		extraireAnnee := func(dateStr string) int {
-			parts := strings.Split(dateStr, "-")
-			if len(parts) == 3 {
-				annee, err := strconv.Atoi(parts[2])
-				if err == nil {
-					return annee
-				}
-			}
-			return 0
-		}
-
-		premierAlbumMin := 0
-		premierAlbumMax := 9999
-		if entryPremierAlbumMin.Text != "" {
-			if val, err := strconv.Atoi(strings.TrimSpace(entryPremierAlbumMin.Text)); err == nil {
-				premierAlbumMin = val
-			}
-		}
-		if entryPremierAlbumMax.Text != "" {
-			if val, err := strconv.Atoi(strings.TrimSpace(entryPremierAlbumMax.Text)); err == nil {
-				premierAlbumMax = val
 			}
 		}
 
@@ -446,14 +401,6 @@ func VueAccueil(
 				continue
 			}
 
-			// --- Filtre plage premier album ---
-			anneeAlbum := extraireAnnee(a.PremierAlbum)
-			if anneeAlbum != 0 {
-				if anneeAlbum < premierAlbumMin || anneeAlbum > premierAlbumMax {
-					continue
-				}
-			}
-
 			// --- Filtre recherche lieux ---
 			if lieutexte != "" {
 				if !idsLieuxFiltre[a.ID] {
@@ -492,9 +439,8 @@ func VueAccueil(
 				case "Artiste":
 					a1, a2 := strings.ToLower(artistesFiltres[j].Nom), strings.ToLower(artistesFiltres[j+1].Nom)
 					echange = a1 > a2
-				case "Premier album":
-					a1, a2 := strings.ToLower(artistesFiltres[j].PremierAlbum), strings.ToLower(artistesFiltres[j+1].PremierAlbum)
-					echange = a1 > a2
+				case "Date de création":
+					echange = artistesFiltres[j].AnneeCreation > artistesFiltres[j+1].AnneeCreation
 				}
 				if echange {
 					artistesFiltres[j], artistesFiltres[j+1] = artistesFiltres[j+1], artistesFiltres[j]
@@ -518,9 +464,6 @@ func VueAccueil(
 	// Plages
 	entryAnneeCreationMin.OnChanged = func(string) { appliquer() }
 	entryAnneeCreationMax.OnChanged = func(string) { appliquer() }
-	entryPremierAlbumMin.OnChanged = func(string) { appliquer() }
-	entryPremierAlbumMax.OnChanged = func(string) { appliquer() }
-
 	// Recherche lieux
 	entryLieux.OnChanged = func(string) { appliquer() }
 
