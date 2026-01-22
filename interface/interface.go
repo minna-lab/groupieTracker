@@ -23,6 +23,7 @@ import (
 // Theme personnalisé en mode dark
 type ThemePerso struct{}
 
+// Color surcharge les couleurs du thème Fyne pour appliquer une palette sombre personnalisée.
 func (ThemePerso) Color(name fyne.ThemeColorName, variant fyne.ThemeVariant) color.Color {
 	colors := map[fyne.ThemeColorName]color.Color{
 		theme.ColorNamePrimary: color.NRGBA{34, 139, 230, 255}, theme.ColorNameSelection: color.NRGBA{34, 139, 230, 55},
@@ -34,10 +35,17 @@ func (ThemePerso) Color(name fyne.ThemeColorName, variant fyne.ThemeVariant) col
 	}
 	return theme.DefaultTheme().Color(name, theme.VariantDark)
 }
-func (ThemePerso) Font(style fyne.TextStyle) fyne.Resource    { return theme.DefaultTheme().Font(style) }
-func (ThemePerso) Icon(name fyne.ThemeIconName) fyne.Resource { return theme.DefaultTheme().Icon(name) }
-func (ThemePerso) Size(name fyne.ThemeSizeName) float32       { return theme.DefaultTheme().Size(name) }
 
+// Font délègue la gestion des polices au thème par défaut de Fyne.
+func (ThemePerso) Font(style fyne.TextStyle) fyne.Resource { return theme.DefaultTheme().Font(style) }
+
+// Icon délègue la gestion des icônes au thème par défaut de Fyne.
+func (ThemePerso) Icon(name fyne.ThemeIconName) fyne.Resource { return theme.DefaultTheme().Icon(name) }
+
+// Size délègue la gestion des tailles (padding, icônes, etc.) au thème par défaut de Fyne.
+func (ThemePerso) Size(name fyne.ThemeSizeName) float32 { return theme.DefaultTheme().Size(name) }
+
+// tronquer coupe un texte trop long et ajoute une ellipse pour éviter les débordements dans l’UI.
 func tronquer(texte string, max int) string {
 	texte = strings.TrimSpace(texte)
 	if max <= 0 || len(texte) <= max {
@@ -46,15 +54,15 @@ func tronquer(texte string, max int) string {
 	return texte[:max-1] + "…"
 }
 
-// genererCarteGoogleMaps crée une URL OpenStreetMap interactive pour un lieu
+// genererCarteGoogleMaps construit une URL OpenStreetMap pour rechercher un lieu dans une carte interactive.
 func genererCarteGoogleMaps(lieu string) string {
 	// URL OpenStreetMap avec le lieu comme marqueur
 	// Format: https://www.openstreetmap.org/search?query=lieu
 	mapsURL := "https://www.openstreetmap.org/search?query=" + url.QueryEscape(lieu)
-
 	return mapsURL
 }
 
+// Carte enveloppe un contenu dans un composant "carte" avec fond arrondi et ombre légère.
 func Carte(contenu fyne.CanvasObject) fyne.CanvasObject {
 	bg := canvas.NewRectangle(theme.Color(theme.ColorNameInputBackground))
 	bg.CornerRadius = 14
@@ -63,12 +71,14 @@ func Carte(contenu fyne.CanvasObject) fyne.CanvasObject {
 	return container.NewPadded(container.NewStack(container.NewPadded(ombre), bg, container.NewPadded(contenu)))
 }
 
+// TitreSection crée un titre de section stylé (gras, taille augmentée) pour structurer l’interface.
 func TitreSection(texte string) fyne.CanvasObject {
 	t := canvas.NewText(texte, theme.Color(theme.ColorNameForeground))
 	t.TextStyle, t.TextSize = fyne.TextStyle{Bold: true}, 18
 	return t
 }
 
+// VueChargement affiche un écran de chargement avec barre animée et un bouton retour optionnel.
 func VueChargement(titre, message string, onRetour func()) fyne.CanvasObject {
 	barre := widget.NewProgressBarInfinite()
 	barre.Start()
@@ -76,13 +86,19 @@ func VueChargement(titre, message string, onRetour func()) fyne.CanvasObject {
 	if onRetour != nil {
 		retour = widget.NewButton("← Retour", onRetour)
 	}
-	return container.NewCenter(container.NewVBox(widget.NewLabelWithStyle(titre, fyne.TextAlignCenter, fyne.TextStyle{Bold: true}), widget.NewLabel(message), barre, retour))
+	return container.NewCenter(container.NewVBox(
+		widget.NewLabelWithStyle(titre, fyne.TextAlignCenter, fyne.TextStyle{Bold: true}),
+		widget.NewLabel(message),
+		barre,
+		retour,
+	))
 }
 
 // ============================================================================
 // VUE ACCUEIL - LAYOUT 2 COLONNES
 // ============================================================================
 
+// VueAccueil construit la page principale avec recherche, filtres, suggestions et grille d’artistes cliquables.
 func VueAccueil(
 	artistes []modele.Artiste,
 	imagesArtistes map[int]fyne.Resource,
@@ -96,7 +112,7 @@ func VueAccueil(
 	// Conteneur pour la grille d'artistes
 	grilleArtistes := container.NewVBox()
 
-	// Fonction pour créer une carte artiste
+	// creerCarteArtiste génère une carte UI cliquable pour afficher l’image, le nom et l’année d’un artiste.
 	creerCarteArtiste := func(artiste modele.Artiste) fyne.CanvasObject {
 		// Image
 		var img *canvas.Image
@@ -147,7 +163,7 @@ func VueAccueil(
 		)
 	}
 
-	// Fonction pour rafraîchir la grille
+	// rafraichirGrille reconstruit l’affichage de la grille selon la liste filtrée d’artistes.
 	var rafraichirGrille func()
 	rafraichirGrille = func() {
 		grilleArtistes.Objects = nil
@@ -188,15 +204,19 @@ func VueAccueil(
 			o.(*widget.Label).SetText(s.Texte + " — " + s.Type)
 		},
 	)
+
+	// OnSelected remplit la barre de recherche avec la suggestion choisie.
 	listeSuggestions.OnSelected = func(id widget.ListItemID) {
 		if id < 0 || id >= len(suggestionsFiltrees) {
 			return
 		}
 		recherche.SetText(suggestionsFiltrees[id].Texte)
 	}
+
 	// Limiter la hauteur de la liste de suggestions
 	listeSuggestions.Resize(fyne.NewSize(0, 150))
 
+	// idsDepuisSuggestions renvoie les IDs d’artistes associés aux suggestions d’un type correspondant au texte recherché.
 	idsDepuisSuggestions := func(texte, typ string) map[int]bool {
 		res := make(map[int]bool)
 		for _, s := range suggestions {
@@ -207,21 +227,35 @@ func VueAccueil(
 		return res
 	}
 
-	check1Membre, check2Membres, check3Membres, check4Membres, check5PlusMembres := widget.NewCheck("1", nil), widget.NewCheck("2", nil), widget.NewCheck("3", nil), widget.NewCheck("4", nil), widget.NewCheck("5+", nil)
-	filtreNbMembres := container.NewVBox(widget.NewLabel("Membres :"), container.NewGridWithColumns(5, check1Membre, check2Membres, check3Membres, check4Membres, check5PlusMembres))
+	check1Membre, check2Membres, check3Membres, check4Membres, check5PlusMembres :=
+		widget.NewCheck("1", nil),
+		widget.NewCheck("2", nil),
+		widget.NewCheck("3", nil),
+		widget.NewCheck("4", nil),
+		widget.NewCheck("5+", nil)
+
+	filtreNbMembres := container.NewVBox(
+		widget.NewLabel("Membres :"),
+		container.NewGridWithColumns(5, check1Membre, check2Membres, check3Membres, check4Membres, check5PlusMembres),
+	)
 
 	entryAnneeCreationMin, entryAnneeCreationMax := widget.NewEntry(), widget.NewEntry()
 	entryAnneeCreationMin.SetPlaceHolder("Min (ex: 1990)")
 	entryAnneeCreationMax.SetPlaceHolder("Max (ex: 2020)")
-	filtrePlageCreation := container.NewVBox(widget.NewLabel("Année de création :"), container.NewGridWithColumns(2, entryAnneeCreationMin, entryAnneeCreationMax))
+	filtrePlageCreation := container.NewVBox(
+		widget.NewLabel("Année de création :"),
+		container.NewGridWithColumns(2, entryAnneeCreationMin, entryAnneeCreationMax),
+	)
 
 	entryLieux := widget.NewEntry()
 	entryLieux.SetPlaceHolder("Chercher un lieu...")
 	filtreRechercheLieux := container.NewVBox(widget.NewLabel("Lieux de concerts :"), entryLieux)
+
 	selectTrierPar := widget.NewSelect([]string{"Artiste", "Date de premier album"}, nil)
 	selectTrierPar.SetSelected("Artiste")
 	filtreTri := container.NewVBox(widget.NewLabel("Trier par :"), selectTrierPar)
 
+	// appliquer applique l’ensemble des filtres, met à jour les suggestions et reconstruit la grille affichée.
 	var appliquer func()
 
 	btnReinitialiser := widget.NewButton("🔄 Réinitialiser les filtres", func() {
@@ -237,7 +271,17 @@ func VueAccueil(
 		selectTrierPar.SetSelected("Artiste")
 	})
 
-	tousLesFiltres := container.NewVBox(filtreTri, widget.NewSeparator(), filtreNbMembres, widget.NewSeparator(), filtrePlageCreation, widget.NewSeparator(), filtreRechercheLieux, widget.NewSeparator(), btnReinitialiser)
+	tousLesFiltres := container.NewVBox(
+		filtreTri,
+		widget.NewSeparator(),
+		filtreNbMembres,
+		widget.NewSeparator(),
+		filtrePlageCreation,
+		widget.NewSeparator(),
+		filtreRechercheLieux,
+		widget.NewSeparator(),
+		btnReinitialiser,
+	)
 
 	appliquer = func() {
 		texte := strings.ToLower(strings.TrimSpace(recherche.Text))
@@ -355,21 +399,34 @@ func VueAccueil(
 				}
 			}
 		}
+
 		rafraichirGrille()
 	}
 
 	recherche.OnChanged, selectTrierPar.OnChanged = func(string) { appliquer() }, func(string) { appliquer() }
-	check1Membre.OnChanged, check2Membres.OnChanged, check3Membres.OnChanged, check4Membres.OnChanged, check5PlusMembres.OnChanged = func(bool) { appliquer() }, func(bool) { appliquer() }, func(bool) { appliquer() }, func(bool) { appliquer() }, func(bool) { appliquer() }
-	entryAnneeCreationMin.OnChanged, entryAnneeCreationMax.OnChanged, entryLieux.OnChanged = func(string) { appliquer() }, func(string) { appliquer() }, func(string) { appliquer() }
+	check1Membre.OnChanged, check2Membres.OnChanged, check3Membres.OnChanged, check4Membres.OnChanged, check5PlusMembres.OnChanged =
+		func(bool) { appliquer() }, func(bool) { appliquer() }, func(bool) { appliquer() }, func(bool) { appliquer() }, func(bool) { appliquer() }
+	entryAnneeCreationMin.OnChanged, entryAnneeCreationMax.OnChanged, entryLieux.OnChanged =
+		func(string) { appliquer() }, func(string) { appliquer() }, func(string) { appliquer() }
 
-	colonneGauche := container.NewVBox(widget.NewLabelWithStyle("🔍 Recherche", fyne.TextAlignLeading, fyne.TextStyle{Bold: true}), recherche, listeSuggestions, widget.NewSeparator(), widget.NewLabelWithStyle("⚙️ Filtres", fyne.TextAlignLeading, fyne.TextStyle{Bold: true}), tousLesFiltres)
+	colonneGauche := container.NewVBox(
+		widget.NewLabelWithStyle("🔍 Recherche", fyne.TextAlignLeading, fyne.TextStyle{Bold: true}),
+		recherche,
+		listeSuggestions,
+		widget.NewSeparator(),
+		widget.NewLabelWithStyle("⚙️ Filtres", fyne.TextAlignLeading, fyne.TextStyle{Bold: true}),
+		tousLesFiltres,
+	)
 
 	colonneGaucheScroll := container.NewVScroll(colonneGauche)
 	colonneGaucheScroll.SetMinSize(fyne.NewSize(300, 0))
 	colonneGaucheAvecBg := container.NewStack(canvas.NewRectangle(color.NRGBA{25, 25, 30, 255}), colonneGaucheScroll)
+
 	titreGroupieTracker := canvas.NewText("🎸 GROUPIE TRACKER", theme.Color(theme.ColorNameForeground))
-	titreGroupieTracker.TextStyle, titreGroupieTracker.TextSize, titreGroupieTracker.Alignment = fyne.TextStyle{Bold: true}, 32, fyne.TextAlignCenter
+	titreGroupieTracker.TextStyle, titreGroupieTracker.TextSize, titreGroupieTracker.Alignment =
+		fyne.TextStyle{Bold: true}, 32, fyne.TextAlignCenter
 	enTeteGlobal := container.NewCenter(titreGroupieTracker)
+
 	titreEcouter := canvas.NewText("🎵 ÉCOUTER", theme.Color(theme.ColorNameForeground))
 	titreEcouter.TextStyle, titreEcouter.TextSize = fyne.TextStyle{Bold: true}, 24
 	sousTitre := canvas.NewText("Pour vous", theme.Color(theme.ColorNameForeground))
@@ -379,10 +436,11 @@ func VueAccueil(
 	appliquer()
 	colonneDroite := container.NewBorder(enTeteDroite, nil, nil, nil, container.NewVScroll(grilleArtistes))
 	contenuPrincipal := container.NewBorder(nil, nil, colonneGaucheAvecBg, nil, colonneDroite)
+
 	return container.NewBorder(enTeteGlobal, nil, nil, nil, contenuPrincipal), rafraichirGrille
 }
 
-// Vue détails d'un artiste
+// VueDetailsArtiste construit l’écran de détails d’un artiste avec infos, favoris, et liste des concerts par lieu.
 func VueDetailsArtiste(
 	fenetre fyne.Window,
 	artiste modele.Artiste,
@@ -394,6 +452,8 @@ func VueDetailsArtiste(
 	gestionnaireFavoris := service.ObtenirGestionnaireFavoris()
 	estFavori := gestionnaireFavoris.EstFavori(artiste.ID)
 	btnFavori := widget.NewButton("", nil)
+
+	// majTexteFavori met à jour le libellé du bouton favoris selon l’état courant.
 	majTexteFavori := func() {
 		if estFavori {
 			btnFavori.SetText("💔 Retirer des favoris")
@@ -402,7 +462,12 @@ func VueDetailsArtiste(
 		}
 	}
 	majTexteFavori()
-	btnFavori.OnTapped = func() { estFavori = gestionnaireFavoris.Basculer(artiste); majTexteFavori() }
+
+	btnFavori.OnTapped = func() {
+		estFavori = gestionnaireFavoris.Basculer(artiste)
+		majTexteFavori()
+	}
+
 	btnSpotify := widget.NewButton("🎵 Spotify", func() {
 		if u, err := url.Parse("spotify:search:" + url.QueryEscape(artiste.Nom)); err == nil {
 			fyne.CurrentApp().OpenURL(u)
@@ -410,11 +475,14 @@ func VueDetailsArtiste(
 			dialog.ShowError(err, fenetre)
 		}
 	})
+
 	barreBoutons := container.NewHBox(btnRetour, btnFavori, btnSpotify)
 
+	// card crée une carte Fyne standardisée avec un titre et un contenu.
 	card := func(titre string, contenu fyne.CanvasObject) fyne.CanvasObject {
 		return widget.NewCard(titre, "", contenu)
 	}
+
 	var imageArtiste fyne.CanvasObject
 	if artiste.Image != "" {
 		img := canvas.NewImageFromURI(storage.NewURI(artiste.Image))
@@ -424,8 +492,21 @@ func VueDetailsArtiste(
 	} else {
 		imageArtiste = widget.NewLabel("Image non disponible")
 	}
-	blocArtiste := card("Artiste", container.NewVBox(imageArtiste, widget.NewLabelWithStyle(artiste.Nom, fyne.TextAlignLeading, fyne.TextStyle{Bold: true})))
-	blocInfos := card("Informations", container.NewVBox(widget.NewLabel(fmt.Sprintf("📅 Année de création : %d", artiste.AnneeCreation)), widget.NewLabel(fmt.Sprintf("💿 Premier album : %s", artiste.PremierAlbum))))
+
+	blocArtiste := card("Artiste",
+		container.NewVBox(
+			imageArtiste,
+			widget.NewLabelWithStyle(artiste.Nom, fyne.TextAlignLeading, fyne.TextStyle{Bold: true}),
+		),
+	)
+
+	blocInfos := card("Informations",
+		container.NewVBox(
+			widget.NewLabel(fmt.Sprintf("📅 Année de création : %d", artiste.AnneeCreation)),
+			widget.NewLabel(fmt.Sprintf("💿 Premier album : %s", artiste.PremierAlbum)),
+		),
+	)
+
 	lblMembres := widget.NewLabel(strings.Join(artiste.Membres, ", "))
 	lblMembres.Wrapping = fyne.TextWrapWord
 	blocMembres := card("Membres", lblMembres)
@@ -512,10 +593,15 @@ func VueDetailsArtiste(
 		blocConcerts = card("Concerts", grille)
 	}
 
-	return container.NewVScroll(container.NewVBox(barreBoutons, container.NewGridWithColumns(2, blocArtiste, blocInfos), blocMembres, blocConcerts))
+	return container.NewVScroll(container.NewVBox(
+		barreBoutons,
+		container.NewGridWithColumns(2, blocArtiste, blocInfos),
+		blocMembres,
+		blocConcerts,
+	))
 }
 
-// Vue favoris
+// VueFavoris affiche la liste des artistes favoris et permet de naviguer vers leurs détails.
 func VueFavoris(onSelection func(modele.Artiste), rafraichir func() []modele.Artiste, retour func()) fyne.CanvasObject {
 	favoris := rafraichir()
 	listeFavoris := widget.NewList(
@@ -549,6 +635,8 @@ func VueFavoris(onSelection func(modele.Artiste), rafraichir func() []modele.Art
 			label.SetText(artiste.Nom)
 		},
 	)
+
+	// OnSelected ouvre la page détail de l’artiste favori sélectionné.
 	listeFavoris.OnSelected = func(id widget.ListItemID) {
 		if id >= 0 && id < len(favoris) {
 			onSelection(favoris[id])
