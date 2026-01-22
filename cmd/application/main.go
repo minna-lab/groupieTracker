@@ -28,161 +28,72 @@ func main() {
 	w.SetContent(interfacegraphique.VueChargement("Chargement", "Récupération des artistes…", func() {}))
 	w.Show()
 
-	// Chargement des artistes en arrière-plan
 	go func() {
 		artistes, err := api.RecupererArtistes()
 		if err != nil {
-			fyne.Do(func() {
-				w.SetContent(container.NewCenter(widget.NewLabel("Erreur : " + err.Error())))
-			})
+			fyne.Do(func() { w.SetContent(container.NewCenter(widget.NewLabel("Erreur : " + err.Error()))) })
 			return
 		}
 
-		// Map partagée pour les images (chargées progressivement)
 		imagesArtistes := make(map[int]fyne.Resource)
 		var mu sync.Mutex
-
 		var vueAccueil *fyne.Container
-
-		// Construction de l'accueil
 		suggestions := service.ConstruireSuggestions(artistes, cache)
 		gestionnaireFavoris := service.ObtenirGestionnaireFavoris()
-
-		// Variable pour stocker la fonction de rafraîchissement
 		var rafraichirGrilleAccueil func()
-
-		// Vue accueil artistes
-		contenuAccueil, rafraichirGrilleAccueil := interfacegraphique.VueAccueil(
-			artistes,
-			imagesArtistes,
-
-			// clic artiste => détails
-			func(artiste modele.Artiste) {
-				w.SetContent(interfacegraphique.VueChargement(
-					"Chargement",
-					"Récupération des concerts…",
-					func() { w.SetContent(vueAccueil) },
-				))
-
-				go func() {
-					relation, err := service.RecupererRelationAvecCache(cache, artiste.ID)
-
-					if err != nil {
-						fyne.Do(func() {
-							btnRetour := widget.NewButton("← Retour", func() { w.SetContent(vueAccueil) })
-							w.SetContent(container.NewCenter(container.NewVBox(
-								widget.NewLabel("Erreur : "+err.Error()),
-								btnRetour,
-							)))
-						})
-						return
-					}
-
+		chargerDetails := func(artiste modele.Artiste) {
+			w.SetContent(interfacegraphique.VueChargement("Chargement", "Récupération des concerts…", func() { w.SetContent(vueAccueil) }))
+			go func() {
+				relation, err := service.RecupererRelationAvecCache(cache, artiste.ID)
+				if err != nil {
 					fyne.Do(func() {
-						w.SetContent(interfacegraphique.VueDetailsArtiste(
-							w,
-							artiste,
-							relation,
-							func() { w.SetContent(vueAccueil) },
-						))
+						w.SetContent(container.NewCenter(container.NewVBox(widget.NewLabel("Erreur : "+err.Error()), widget.NewButton("← Retour", func() { w.SetContent(vueAccueil) }))))
 					})
-				}()
-			},
+					return
+				}
+				fyne.Do(func() {
+					w.SetContent(interfacegraphique.VueDetailsArtiste(w, artiste, relation, func() { w.SetContent(vueAccueil) }))
+				})
+			}()
+		}
 
-			suggestions,
-		)
+		contenuAccueil, rafraichirGrilleAccueil := interfacegraphique.VueAccueil(artistes, imagesArtistes, chargerDetails, suggestions)
 
-		// Bouton favoris à droite
 		btnFavoris := widget.NewButton("❤️ Mes Favoris", func() {
-			vueFavoris := interfacegraphique.VueFavoris(
-				// clic artiste favori => détails
-				func(artiste modele.Artiste) {
-					w.SetContent(interfacegraphique.VueChargement(
-						"Chargement",
-						"Récupération des concerts…",
-						func() { w.SetContent(vueAccueil) },
-					))
-
-					go func() {
-						relation, err := service.RecupererRelationAvecCache(cache, artiste.ID)
-
-						if err != nil {
-							fyne.Do(func() {
-								btnRetour := widget.NewButton("← Retour", func() { w.SetContent(vueAccueil) })
-								w.SetContent(container.NewCenter(container.NewVBox(
-									widget.NewLabel("Erreur : "+err.Error()),
-									btnRetour,
-								)))
-							})
-							return
-						}
-
-						fyne.Do(func() {
-							w.SetContent(interfacegraphique.VueDetailsArtiste(
-								w,
-								artiste,
-								relation,
-								func() { w.SetContent(vueAccueil) },
-							))
-						})
-					}()
-				},
-				// fonction pour rafraîchir la liste des favoris
-				func() []modele.Artiste {
-					return gestionnaireFavoris.ObtenirFavoris()
-				},
-				// fonction de retour
-				func() { w.SetContent(vueAccueil) },
-			)
-			w.SetContent(vueFavoris)
+			w.SetContent(interfacegraphique.VueFavoris(chargerDetails, func() []modele.Artiste { return gestionnaireFavoris.ObtenirFavoris() }, func() { w.SetContent(vueAccueil) }))
 		})
+		vueAccueil = container.NewBorder(container.NewBorder(nil, nil, nil, btnFavoris), nil, nil, nil, contenuAccueil)
+		fyne.Do(func() { w.SetContent(vueAccueil) })
 
-		// Créer une barre d'outils en haut à droite
-		barreHaut := container.NewBorder(nil, nil, nil, btnFavoris)
-
-		// Assembler la vue complète avec le bouton en haut
-		vueAccueil = container.NewBorder(barreHaut, nil, nil, nil, contenuAccueil)
-
-		fyne.Do(func() {
-			w.SetContent(vueAccueil)
-		})
-
-		// Charger les images en arrière-plan APRÈS avoir affiché l'interface
 		go func() {
-			// Limiter les téléchargements simultanés à 10
 			semaphore := make(chan struct{}, 10)
 			var wg sync.WaitGroup
-
 			for _, artiste := range artistes {
 				if artiste.Image == "" {
 					continue
 				}
-
 				wg.Add(1)
 				go func(id int, imageURL string) {
 					defer wg.Done()
 					semaphore <- struct{}{}
 					defer func() { <-semaphore }()
-
-					resp, err := http.Get(imageURL)
-					if err == nil {
-						imgData, err := io.ReadAll(resp.Body)
-						resp.Body.Close()
-						if err == nil {
+					if resp, err := http.Get(imageURL); err == nil {
+						if imgData, err := io.ReadAll(resp.Body); err == nil {
+							resp.Body.Close()
 							mu.Lock()
 							imagesArtistes[id] = fyne.NewStaticResource("artiste", imgData)
 							mu.Unlock()
-							// Rafraîchir l'interface pour afficher la nouvelle image (sur le thread UI)
 							fyne.Do(func() {
 								if rafraichirGrilleAccueil != nil {
 									rafraichirGrilleAccueil()
 								}
 							})
+						} else {
+							resp.Body.Close()
 						}
 					}
 				}(artiste.ID, artiste.Image)
 			}
-
 			wg.Wait()
 		}()
 	}()
