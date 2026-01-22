@@ -25,38 +25,19 @@ type ThemePerso struct{}
 
 func (ThemePerso) Color(name fyne.ThemeColorName, variant fyne.ThemeVariant) color.Color {
 	colors := map[fyne.ThemeColorName]color.Color{
-		theme.ColorNamePrimary:   color.NRGBA{34, 139, 230, 255},
-		theme.ColorNameSelection: color.NRGBA{34, 139, 230, 55},
+		theme.ColorNamePrimary: color.NRGBA{34, 139, 230, 255}, theme.ColorNameSelection: color.NRGBA{34, 139, 230, 55},
+		theme.ColorNameBackground: color.NRGBA{16, 16, 18, 255}, theme.ColorNameInputBackground: color.NRGBA{28, 28, 33, 255},
+		theme.ColorNameForeground: color.NRGBA{235, 235, 235, 255},
 	}
 	if c, ok := colors[name]; ok {
 		return c
 	}
-	// Mode dark par défaut
-	if name == theme.ColorNameBackground {
-		return color.NRGBA{16, 16, 18, 255}
-	}
-	if name == theme.ColorNameInputBackground {
-		return color.NRGBA{28, 28, 33, 255}
-	}
-	if name == theme.ColorNameForeground {
-		return color.NRGBA{235, 235, 235, 255}
-	}
 	return theme.DefaultTheme().Color(name, theme.VariantDark)
 }
+func (ThemePerso) Font(style fyne.TextStyle) fyne.Resource    { return theme.DefaultTheme().Font(style) }
+func (ThemePerso) Icon(name fyne.ThemeIconName) fyne.Resource { return theme.DefaultTheme().Icon(name) }
+func (ThemePerso) Size(name fyne.ThemeSizeName) float32       { return theme.DefaultTheme().Size(name) }
 
-func (ThemePerso) Font(style fyne.TextStyle) fyne.Resource {
-	return theme.DefaultTheme().Font(style)
-}
-
-func (ThemePerso) Icon(name fyne.ThemeIconName) fyne.Resource {
-	return theme.DefaultTheme().Icon(name)
-}
-
-func (ThemePerso) Size(name fyne.ThemeSizeName) float32 {
-	return theme.DefaultTheme().Size(name)
-}
-
-// coupe un texte trop long pour éviter qu'il déborde
 func tronquer(texte string, max int) string {
 	texte = strings.TrimSpace(texte)
 	if max <= 0 || len(texte) <= max {
@@ -65,7 +46,6 @@ func tronquer(texte string, max int) string {
 	return texte[:max-1] + "…"
 }
 
-// Composants réutilisables
 func Carte(contenu fyne.CanvasObject) fyne.CanvasObject {
 	bg := canvas.NewRectangle(theme.Color(theme.ColorNameInputBackground))
 	bg.CornerRadius = 14
@@ -76,12 +56,10 @@ func Carte(contenu fyne.CanvasObject) fyne.CanvasObject {
 
 func TitreSection(texte string) fyne.CanvasObject {
 	t := canvas.NewText(texte, theme.Color(theme.ColorNameForeground))
-	t.TextStyle = fyne.TextStyle{Bold: true}
-	t.TextSize = 18
+	t.TextStyle, t.TextSize = fyne.TextStyle{Bold: true}, 18
 	return t
 }
 
-// Vue de chargement
 func VueChargement(titre, message string, onRetour func()) fyne.CanvasObject {
 	barre := widget.NewProgressBarInfinite()
 	barre.Start()
@@ -89,9 +67,7 @@ func VueChargement(titre, message string, onRetour func()) fyne.CanvasObject {
 	if onRetour != nil {
 		retour = widget.NewButton("← Retour", onRetour)
 	}
-	return container.NewCenter(container.NewVBox(
-		widget.NewLabelWithStyle(titre, fyne.TextAlignCenter, fyne.TextStyle{Bold: true}),
-		widget.NewLabel(message), barre, retour))
+	return container.NewCenter(container.NewVBox(widget.NewLabelWithStyle(titre, fyne.TextAlignCenter, fyne.TextStyle{Bold: true}), widget.NewLabel(message), barre, retour))
 }
 
 // ============================================================================
@@ -222,98 +198,37 @@ func VueAccueil(
 		return res
 	}
 
-	// --- Filtre à CASES : Nombre de membres (SIMPLIFIÉ) ---
-	labelNbMembres := widget.NewLabel("Membres :")
-	check1Membre := widget.NewCheck("1", nil)
-	check2Membres := widget.NewCheck("2", nil)
-	check3Membres := widget.NewCheck("3", nil)
-	check4Membres := widget.NewCheck("4", nil)
-	check5PlusMembres := widget.NewCheck("5+", nil)
+	check1Membre, check2Membres, check3Membres, check4Membres, check5PlusMembres := widget.NewCheck("1", nil), widget.NewCheck("2", nil), widget.NewCheck("3", nil), widget.NewCheck("4", nil), widget.NewCheck("5+", nil)
+	filtreNbMembres := container.NewVBox(widget.NewLabel("Membres :"), container.NewGridWithColumns(5, check1Membre, check2Membres, check3Membres, check4Membres, check5PlusMembres))
 
-	// Disposition horizontale compacte
-	filtreNbMembres := container.NewVBox(
-		labelNbMembres,
-		container.NewGridWithColumns(5,
-			check1Membre,
-			check2Membres,
-			check3Membres,
-			check4Membres,
-			check5PlusMembres,
-		),
-	)
-
-	// --- Filtre PLAGE : Année de création ---
-	labelAnneeCreation := widget.NewLabel("Année de création :")
-	entryAnneeCreationMin := widget.NewEntry()
+	entryAnneeCreationMin, entryAnneeCreationMax := widget.NewEntry(), widget.NewEntry()
 	entryAnneeCreationMin.SetPlaceHolder("Min (ex: 1990)")
-	entryAnneeCreationMax := widget.NewEntry()
 	entryAnneeCreationMax.SetPlaceHolder("Max (ex: 2020)")
+	filtrePlageCreation := container.NewVBox(widget.NewLabel("Année de création :"), container.NewGridWithColumns(2, entryAnneeCreationMin, entryAnneeCreationMax))
 
-	filtrePlageCreation := container.NewVBox(
-		labelAnneeCreation,
-		container.NewGridWithColumns(2,
-			entryAnneeCreationMin,
-			entryAnneeCreationMax,
-		),
-	)
-
-	// --- Filtre RECHERCHE : Lieux ---
-	labelLieux := widget.NewLabel("Lieux de concerts :")
 	entryLieux := widget.NewEntry()
 	entryLieux.SetPlaceHolder("Chercher un lieu...")
-
-	filtreRechercheLieux := container.NewVBox(
-		labelLieux,
-		entryLieux,
-	)
-
-	// --- Tri ---
-	labelTri := widget.NewLabel("Trier par :")
+	filtreRechercheLieux := container.NewVBox(widget.NewLabel("Lieux de concerts :"), entryLieux)
 	selectTrierPar := widget.NewSelect([]string{"Artiste", "Date de création"}, nil)
 	selectTrierPar.SetSelected("Artiste")
-
-	filtreTri := container.NewVBox(
-		labelTri,
-		selectTrierPar,
-	)
+	filtreTri := container.NewVBox(widget.NewLabel("Trier par :"), selectTrierPar)
 
 	var appliquer func()
 
-	// --- Bouton réinitialiser ---
 	btnReinitialiser := widget.NewButton("🔄 Réinitialiser les filtres", func() {
-		// Décocher toutes les cases
 		check1Membre.SetChecked(false)
 		check2Membres.SetChecked(false)
 		check3Membres.SetChecked(false)
 		check4Membres.SetChecked(false)
 		check5PlusMembres.SetChecked(false)
-
-		// Vider les champs de plage
 		entryAnneeCreationMin.SetText("")
 		entryAnneeCreationMax.SetText("")
-
-		// Vider la recherche de lieux
 		entryLieux.SetText("")
-
-		// Vider la recherche principale
 		recherche.SetText("")
-
-		// Réinitialiser le tri
 		selectTrierPar.SetSelected("Artiste")
 	})
 
-	// Assemblage de tous les filtres
-	tousLesFiltres := container.NewVBox(
-		filtreTri,
-		widget.NewSeparator(),
-		filtreNbMembres,
-		widget.NewSeparator(),
-		filtrePlageCreation,
-		widget.NewSeparator(),
-		filtreRechercheLieux,
-		widget.NewSeparator(),
-		btnReinitialiser,
-	)
+	tousLesFiltres := container.NewVBox(filtreTri, widget.NewSeparator(), filtreNbMembres, widget.NewSeparator(), filtrePlageCreation, widget.NewSeparator(), filtreRechercheLieux, widget.NewSeparator(), btnReinitialiser)
 
 	appliquer = func() {
 		texte := strings.ToLower(strings.TrimSpace(recherche.Text))
@@ -332,9 +247,7 @@ func VueAccueil(
 		}
 		listeSuggestions.Refresh()
 
-		// --- Récupérer les filtres de plage année création ---
-		anneeCreationMin := 0
-		anneeCreationMax := 9999
+		anneeCreationMin, anneeCreationMax := 0, 9999
 		if entryAnneeCreationMin.Text != "" {
 			if val, err := strconv.Atoi(strings.TrimSpace(entryAnneeCreationMin.Text)); err == nil {
 				anneeCreationMin = val
@@ -346,7 +259,6 @@ func VueAccueil(
 			}
 		}
 
-		// --- Récupérer filtre recherche lieux ---
 		lieutexte := strings.ToLower(strings.TrimSpace(entryLieux.Text))
 		idsLieuxFiltre := make(map[int]bool)
 		if lieutexte != "" {
@@ -357,7 +269,6 @@ func VueAccueil(
 			}
 		}
 
-		// --- Récupérer filtres cases à cocher (nombre de membres) ---
 		membresVoulus := make(map[int]bool)
 		if check1Membre.Checked {
 			membresVoulus[1] = true
@@ -372,9 +283,8 @@ func VueAccueil(
 			membresVoulus[4] = true
 		}
 		if check5PlusMembres.Checked {
-			membresVoulus[5] = true // 5 ou plus
+			membresVoulus[5] = true
 		}
-		// Si aucune case cochée, on accepte tous les nombres de membres
 		accepterTousMembres := len(membresVoulus) == 0
 
 		// Filtrer artistes
@@ -382,30 +292,18 @@ func VueAccueil(
 		artistesFiltres = artistesFiltres[:0]
 
 		for _, a := range artistes {
-			// --- Filtre nombre de membres (cases à cocher) ---
 			if !accepterTousMembres {
 				nbMembres := len(a.Membres)
-				trouve := false
-				if nbMembres >= 5 && membresVoulus[5] {
-					trouve = true
-				} else if membresVoulus[nbMembres] {
-					trouve = true
-				}
-				if !trouve {
+				if !((nbMembres >= 5 && membresVoulus[5]) || membresVoulus[nbMembres]) {
 					continue
 				}
 			}
 
-			// --- Filtre plage année de création ---
 			if a.AnneeCreation < anneeCreationMin || a.AnneeCreation > anneeCreationMax {
 				continue
 			}
-
-			// --- Filtre recherche lieux ---
-			if lieutexte != "" {
-				if !idsLieuxFiltre[a.ID] {
-					continue
-				}
+			if lieutexte != "" && !idsLieuxFiltre[a.ID] {
+				continue
 			}
 
 			// --- Filtre texte recherche générale ---
@@ -450,97 +348,28 @@ func VueAccueil(
 		rafraichirGrille()
 	}
 
-	// Connecter tous les événements OnChanged
-	recherche.OnChanged = func(string) { appliquer() }
-	selectTrierPar.OnChanged = func(string) { appliquer() }
+	recherche.OnChanged, selectTrierPar.OnChanged = func(string) { appliquer() }, func(string) { appliquer() }
+	check1Membre.OnChanged, check2Membres.OnChanged, check3Membres.OnChanged, check4Membres.OnChanged, check5PlusMembres.OnChanged = func(bool) { appliquer() }, func(bool) { appliquer() }, func(bool) { appliquer() }, func(bool) { appliquer() }, func(bool) { appliquer() }
+	entryAnneeCreationMin.OnChanged, entryAnneeCreationMax.OnChanged, entryLieux.OnChanged = func(string) { appliquer() }, func(string) { appliquer() }, func(string) { appliquer() }
 
-	// Cases à cocher
-	check1Membre.OnChanged = func(bool) { appliquer() }
-	check2Membres.OnChanged = func(bool) { appliquer() }
-	check3Membres.OnChanged = func(bool) { appliquer() }
-	check4Membres.OnChanged = func(bool) { appliquer() }
-	check5PlusMembres.OnChanged = func(bool) { appliquer() }
+	colonneGauche := container.NewVBox(widget.NewLabelWithStyle("🔍 Recherche", fyne.TextAlignLeading, fyne.TextStyle{Bold: true}), recherche, listeSuggestions, widget.NewSeparator(), widget.NewLabelWithStyle("⚙️ Filtres", fyne.TextAlignLeading, fyne.TextStyle{Bold: true}), tousLesFiltres)
 
-	// Plages
-	entryAnneeCreationMin.OnChanged = func(string) { appliquer() }
-	entryAnneeCreationMax.OnChanged = func(string) { appliquer() }
-	// Recherche lieux
-	entryLieux.OnChanged = func(string) { appliquer() }
-
-	// =========================================================================
-	// COLONNE DE GAUCHE - FILTRES & RECHERCHE
-	// =========================================================================
-	titreRecherche := widget.NewLabelWithStyle("🔍 Recherche", fyne.TextAlignLeading, fyne.TextStyle{Bold: true})
-	titreFiltres := widget.NewLabelWithStyle("⚙️ Filtres", fyne.TextAlignLeading, fyne.TextStyle{Bold: true})
-
-	colonneGauche := container.NewVBox(
-		titreRecherche,
-		recherche,
-		listeSuggestions,
-		widget.NewSeparator(),
-		titreFiltres,
-		tousLesFiltres,
-	)
-
-	// Mettre la colonne gauche dans un scroll pour éviter débordement
 	colonneGaucheScroll := container.NewVScroll(colonneGauche)
 	colonneGaucheScroll.SetMinSize(fyne.NewSize(300, 0))
-
-	// Fond sombre pour la colonne de gauche
-	bgColonneGauche := canvas.NewRectangle(color.NRGBA{25, 25, 30, 255})
-	colonneGaucheAvecBg := container.NewStack(bgColonneGauche, colonneGaucheScroll)
-
-	// =========================================================================
-	// EN-TÊTE AVEC TITRE GROUPIE TRACKER
-	// =========================================================================
+	colonneGaucheAvecBg := container.NewStack(canvas.NewRectangle(color.NRGBA{25, 25, 30, 255}), colonneGaucheScroll)
 	titreGroupieTracker := canvas.NewText("🎸 GROUPIE TRACKER", theme.Color(theme.ColorNameForeground))
-	titreGroupieTracker.TextStyle = fyne.TextStyle{Bold: true}
-	titreGroupieTracker.TextSize = 32
-	titreGroupieTracker.Alignment = fyne.TextAlignCenter
-
+	titreGroupieTracker.TextStyle, titreGroupieTracker.TextSize, titreGroupieTracker.Alignment = fyne.TextStyle{Bold: true}, 32, fyne.TextAlignCenter
 	enTeteGlobal := container.NewCenter(titreGroupieTracker)
-
-	// =========================================================================
-	// COLONNE DE DROITE - LISTE DES ARTISTES
-	// =========================================================================
 	titreEcouter := canvas.NewText("🎵 ÉCOUTER", theme.Color(theme.ColorNameForeground))
-	titreEcouter.TextStyle = fyne.TextStyle{Bold: true}
-	titreEcouter.TextSize = 24
-
+	titreEcouter.TextStyle, titreEcouter.TextSize = fyne.TextStyle{Bold: true}, 24
 	sousTitre := canvas.NewText("Pour vous", theme.Color(theme.ColorNameForeground))
 	sousTitre.TextSize = 16
+	enTeteDroite := container.NewVBox(titreEcouter, sousTitre)
 
-	enTeteDroite := container.NewVBox(
-		titreEcouter,
-		sousTitre,
-	)
-
-	// Scroll pour la grille d'artistes
-	scrollGrille := container.NewVScroll(grilleArtistes)
-
-	colonneDroite := container.NewBorder(enTeteDroite, nil, nil, nil, scrollGrille)
-
-	// =========================================================================
-	// ASSEMBLAGE FINAL - 2 COLONNES AVEC EN-TÊTE
-	// =========================================================================
 	appliquer()
-
-	// Container avec colonnes
-	contenuPrincipal := container.NewBorder(
-		nil, nil,
-		colonneGaucheAvecBg,
-		nil,
-		colonneDroite,
-	)
-
-	// Layout final avec en-tête en haut
-	layoutFinal := container.NewBorder(
-		enTeteGlobal,
-		nil, nil, nil,
-		contenuPrincipal,
-	)
-
-	return layoutFinal, rafraichirGrille
+	colonneDroite := container.NewBorder(enTeteDroite, nil, nil, nil, container.NewVScroll(grilleArtistes))
+	contenuPrincipal := container.NewBorder(nil, nil, colonneGaucheAvecBg, nil, colonneDroite)
+	return container.NewBorder(enTeteGlobal, nil, nil, nil, contenuPrincipal), rafraichirGrille
 }
 
 // Vue détails d'un artiste
@@ -551,14 +380,9 @@ func VueDetailsArtiste(
 	retour func(),
 ) fyne.CanvasObject {
 
-	// -------------------------
-	// Boutons du haut
-	// -------------------------
 	btnRetour := widget.NewButton("← Retour", retour)
-
 	gestionnaireFavoris := service.ObtenirGestionnaireFavoris()
 	estFavori := gestionnaireFavoris.EstFavori(artiste.ID)
-
 	btnFavori := widget.NewButton("", nil)
 	majTexteFavori := func() {
 		if estFavori {
@@ -568,32 +392,19 @@ func VueDetailsArtiste(
 		}
 	}
 	majTexteFavori()
-	btnFavori.OnTapped = func() {
-		ajoute := gestionnaireFavoris.Basculer(artiste)
-		estFavori = ajoute
-		majTexteFavori()
-	}
-
+	btnFavori.OnTapped = func() { estFavori = gestionnaireFavoris.Basculer(artiste); majTexteFavori() }
 	btnSpotify := widget.NewButton("🎵 Spotify", func() {
-		query := url.QueryEscape(artiste.Nom)
-		u, err := url.Parse("spotify:search:" + query)
-		if err != nil {
+		if u, err := url.Parse("spotify:search:" + url.QueryEscape(artiste.Nom)); err == nil {
+			fyne.CurrentApp().OpenURL(u)
+		} else {
 			dialog.ShowError(err, fenetre)
-			return
 		}
-		_ = fyne.CurrentApp().OpenURL(u)
 	})
-
 	barreBoutons := container.NewHBox(btnRetour, btnFavori, btnSpotify)
 
-	// -------------------------
-	// Blocs (cartes)
-	// -------------------------
 	card := func(titre string, contenu fyne.CanvasObject) fyne.CanvasObject {
 		return widget.NewCard(titre, "", contenu)
 	}
-
-	// Image de l'artiste
 	var imageArtiste fyne.CanvasObject
 	if artiste.Image != "" {
 		img := canvas.NewImageFromURI(storage.NewURI(artiste.Image))
@@ -603,19 +414,9 @@ func VueDetailsArtiste(
 	} else {
 		imageArtiste = widget.NewLabel("Image non disponible")
 	}
-
-	// Bloc Artiste avec image
-	lblNom := widget.NewLabelWithStyle(artiste.Nom, fyne.TextAlignLeading, fyne.TextStyle{Bold: true})
-	blocArtiste := card("Artiste", container.NewVBox(imageArtiste, lblNom))
-
-	// Bloc Informations
-	info1 := widget.NewLabel(fmt.Sprintf("📅 Année de création : %d", artiste.AnneeCreation))
-	info2 := widget.NewLabel(fmt.Sprintf("💿 Premier album : %s", artiste.PremierAlbum))
-	blocInfos := card("Informations", container.NewVBox(info1, info2))
-
-	// Bloc Membres (en 2 colonnes pour être plus propre)
-	membresTexte := strings.Join(artiste.Membres, ", ")
-	lblMembres := widget.NewLabel(membresTexte)
+	blocArtiste := card("Artiste", container.NewVBox(imageArtiste, widget.NewLabelWithStyle(artiste.Nom, fyne.TextAlignLeading, fyne.TextStyle{Bold: true})))
+	blocInfos := card("Informations", container.NewVBox(widget.NewLabel(fmt.Sprintf("📅 Année de création : %d", artiste.AnneeCreation)), widget.NewLabel(fmt.Sprintf("💿 Premier album : %s", artiste.PremierAlbum))))
+	lblMembres := widget.NewLabel(strings.Join(artiste.Membres, ", "))
 	lblMembres.Wrapping = fyne.TextWrapWord
 	blocMembres := card("Membres", lblMembres)
 
@@ -697,20 +498,7 @@ func VueDetailsArtiste(
 		blocConcerts = card("Concerts", grille)
 	}
 
-	// -------------------------
-	// Mise en page globale
-	// -------------------------
-	ligneHaut := container.NewGridWithColumns(2, blocArtiste, blocInfos)
-
-	page := container.NewVBox(
-		barreBoutons,
-		ligneHaut,
-		blocMembres,
-		blocConcerts,
-	)
-
-	// Scroll global (pas de scroll interne dans les concerts)
-	return container.NewVScroll(page)
+	return container.NewVScroll(container.NewVBox(barreBoutons, container.NewGridWithColumns(2, blocArtiste, blocInfos), blocMembres, blocConcerts))
 }
 
 // Vue favoris
