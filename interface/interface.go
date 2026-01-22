@@ -103,7 +103,7 @@ func VueAccueil(
 	imagesArtistes map[int]fyne.Resource,
 	onSelection func(modele.Artiste),
 	suggestions []modele.Suggestion,
-) fyne.CanvasObject {
+) (fyne.CanvasObject, func()) {
 
 	artistesFiltres := make([]modele.Artiste, len(artistes))
 	copy(artistesFiltres, artistes)
@@ -495,9 +495,6 @@ func VueAccueil(
 				case "Premier album":
 					a1, a2 := strings.ToLower(artistesFiltres[j].PremierAlbum), strings.ToLower(artistesFiltres[j+1].PremierAlbum)
 					echange = a1 > a2
-				case "Date de création":
-					d1, d2 := artistesFiltres[j].AnneeCreation, artistesFiltres[j+1].AnneeCreation
-					echange = d1 > d2
 				}
 				if echange {
 					artistesFiltres[j], artistesFiltres[j+1] = artistesFiltres[j+1], artistesFiltres[j]
@@ -600,7 +597,7 @@ func VueAccueil(
 		contenuPrincipal,
 	)
 
-	return layoutFinal
+	return layoutFinal, rafraichirGrille
 }
 
 // Vue détails d'un artiste
@@ -720,12 +717,28 @@ func VueDetailsArtiste(
 			listeDates.Add(widget.NewLabel(fmt.Sprintf("… +%d autre(s)", restant)))
 		}
 
+		// Bouton pour ouvrir sur Google Maps
+		btnMaps := widget.NewButton("🗺️ Voir sur Maps", func(lieuCopie string) func() {
+			return func() {
+				// Créer une URL Google Maps avec le lieu
+				query := url.QueryEscape(lieuCopie)
+				mapsURL := "https://www.google.com/maps/search/?api=1&query=" + query
+				u, err := url.Parse(mapsURL)
+				if err == nil {
+					_ = fyne.CurrentApp().OpenURL(u)
+				}
+			}
+		}(lieu))
+		btnMaps.Importance = widget.LowImportance
+
 		contenu := container.NewVBox(
 			titreLieu,
 			widget.NewSeparator(),
 			nb,
 			widget.NewSeparator(),
 			listeDates,
+			widget.NewSeparator(),
+			btnMaps,
 		)
 
 		// La carte elle-même
